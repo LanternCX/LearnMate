@@ -16,10 +16,11 @@ LearnMate 希望通过持续了解学生的知识基础、兴趣与学习表现�
 
 ## 项目状态
 
-项目处于需求整理与初始化阶段，尚无可运行的应用。上述内容为产品规划，具体需求、约束和待明确事项以 [PRD](docs/PRD.md) 为准。
+项目处于需求整理与初始化阶段，尚无可运行的应用。上述内容为产品规划，具体需求、约束和待明确事项以 [总需求 Issue #3](https://github.com/LanternCX/LearnMate/issues/3) 的正文为准。
 
 ## 文档与协作
 
-- [产品需求文档](docs/PRD.md)：了解产品目标、学习场景、设计约束与验收场景。
+- [总需求 Issue #3](https://github.com/LanternCX/LearnMate/issues/3)：维护本轮开发的产品目标、学习场景、设计约束与验收场景；完成验收后关闭归档。
+- [技术选型 Issue #2](https://github.com/LanternCX/LearnMate/issues/2)：查阅已确认的技术栈、职责边界与待定项。
 - [开发约定](AGENTS.md)：参与开发前阅读的项目规则。
 - [Reference Sync](.agent/skills/reference-sync/SKILL.md)：用于查阅、核对和更新项目需求文档的技能说明。
