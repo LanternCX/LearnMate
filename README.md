@@ -23,4 +23,4 @@ LearnMate 希望通过持续了解学生的知识基础、兴趣与学习表现�
 - [总需求 Issue #3](https://github.com/LanternCX/LearnMate/issues/3)：维护本轮开发的产品目标、学习场景、设计约束与验收场景；完成验收后关闭归档。
 - [技术选型 Issue #2](https://github.com/LanternCX/LearnMate/issues/2)：查阅已确认的技术栈、职责边界与待定项。
 - [开发约定](AGENTS.md)：参与开发前阅读的项目规则。
-- [Reference Sync](.agent/skills/reference-sync/SKILL.md)：用于查阅、核对和更新项目需求文档的技能说明。
+- [Reference Sync](.agents/skills/reference-sync/SKILL.md)：用于查阅、核对和更新项目需求文档的技能说明。

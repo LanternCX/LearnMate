@@ -7,7 +7,7 @@ description: Consult, check, or update LearnMate's competition requirements and 
 
 ## Configuration and sources
 
-The skill lives in `.agent/skills/reference-sync/`. Codex discovers it through the directory symlink at `.agents/skills/reference-sync`. The entry point is `SKILL.md` with YAML `name` and `description` fields; no additional global configuration is needed. See the [official Codex skill documentation](https://learn.chatgpt.com/docs/build-skills).
+The skill lives directly in `.agents/skills/reference-sync/`.
 
 Competition requirements live in the repository. Product requirements live only in the GitHub issue body. The competition reference is a relative symlink to the canonical file; do not create a local copy of the product requirements issue.
 
