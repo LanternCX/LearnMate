@@ -1,0 +1,10 @@
+{
+  "name": "learnmate",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "pnpm --filter @learnmate/web dev",
+    "build": "pnpm --filter @learnmate/web build",
+    "test": "pnpm --filter @learnmate/web test"
+  }
+}
