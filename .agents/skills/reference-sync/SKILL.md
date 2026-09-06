@@ -14,6 +14,7 @@ Competition requirements live in the repository. Product requirements live only 
 | Reference | Canonical document | Scope |
 | --- | --- | --- |
 | [competition.md](reference/competition.md) | `docs/competition.md` | JBGS-2026-02 requirements, shared track rules, scoring, and support. |
+| [DESIGN.md](reference/DESIGN.md) | `docs/design/DESIGN.md` | Visual and interaction guidelines; product requirements remain in issue #3. |
 | [Product requirements issue #3](https://github.com/LanternCX/LearnMate/issues/3) | GitHub issue body | Product goals, scenarios, requirements, design constraints, acceptance checks, and open questions. |
 | [Technology selection issue #2](https://github.com/LanternCX/LearnMate/issues/2) | GitHub issue body | Confirmed technology choices, responsibility boundaries, and unresolved technical decisions. |
 
