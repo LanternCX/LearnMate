@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LearnMate · 设计图片</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; color: #142d2a; background: #e6ebe4; font-family: sans-serif; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-bottom: 40px; }
+    h1 { font-size: 24px; margin: 0; }
+    h2 { font-size: 18px; font-weight: 500; }
+    a { color: #356653; }
+    section { margin: 0 auto 56px; max-width: 1600px; }
+    .pair { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 24px; align-items: start; }
+    img { display: block; width: 100%; height: auto; border: 1px solid #ccd6cb; border-radius: 12px; }
+    @media (max-width: 700px) { body { padding: 20px; } header { align-items: start; flex-direction: column; } .pair { grid-template-columns: 1fr; } .pair a:last-child { max-width: 390px; } }
+  </style>
+</head>
+<body>
+  <header><h1>LearnMate · 设计图片</h1><a href="demo.html">打开可缩放的页面画廊</a></header>
+  <section><h2>初次见面</h2><div class="pair"><a href="screenshots/desktop-onboarding.png"><img src="screenshots/desktop-onboarding.png" alt="桌面轻量建档设计"></a><a href="screenshots/mobile-onboarding.png"><img src="screenshots/mobile-onboarding.png" alt="手机轻量建档设计"></a></div></section>
+  <section><h2>学习地图</h2><div class="pair"><a href="screenshots/desktop-home.png"><img src="screenshots/desktop-home.png" alt="桌面学习地图设计" loading="lazy"></a><a href="screenshots/mobile-home.png"><img src="screenshots/mobile-home.png" alt="手机学习地图设计" loading="lazy"></a></div></section>
+  <section><h2>分页课堂</h2><div class="pair"><a href="screenshots/desktop-classroom.png"><img src="screenshots/desktop-classroom.png" alt="桌面课堂设计" loading="lazy"></a><a href="screenshots/mobile-classroom.png"><img src="screenshots/mobile-classroom.png" alt="手机课堂设计" loading="lazy"></a></div></section>
+  <section><h2>提问与恢复</h2><div class="pair"><a href="screenshots/desktop-question.png"><img src="screenshots/desktop-question.png" alt="桌面提问恢复设计" loading="lazy"></a><a href="screenshots/mobile-question.png"><img src="screenshots/mobile-question.png" alt="手机提问恢复设计" loading="lazy"></a></div></section>
+  <section><h2>互动练习</h2><div class="pair"><a href="screenshots/desktop-practice.png"><img src="screenshots/desktop-practice.png" alt="桌面练习反馈设计" loading="lazy"></a><a href="screenshots/mobile-practice.png"><img src="screenshots/mobile-practice.png" alt="手机练习反馈设计" loading="lazy"></a></div></section>
+  <section><h2>自由探索</h2><div class="pair"><a href="screenshots/desktop-explore.png"><img src="screenshots/desktop-explore.png" alt="桌面自由探索设计" loading="lazy"></a><a href="screenshots/mobile-explore.png"><img src="screenshots/mobile-explore.png" alt="手机自由探索设计" loading="lazy"></a></div></section>
+  <section><h2>AI 实验室</h2><div class="pair"><a href="screenshots/desktop-lab.png"><img src="screenshots/desktop-lab.png" alt="桌面 KNN 实验设计" loading="lazy"></a><a href="screenshots/mobile-lab.png"><img src="screenshots/mobile-lab.png" alt="手机 KNN 实验设计" loading="lazy"></a></div></section>
+  <section><h2>学习回顾</h2><div class="pair"><a href="screenshots/desktop-review.png"><img src="screenshots/desktop-review.png" alt="桌面学习回顾设计" loading="lazy"></a><a href="screenshots/mobile-review.png"><img src="screenshots/mobile-review.png" alt="手机学习回顾设计" loading="lazy"></a></div></section>
+  <section><h2>石墨课堂</h2><div class="pair"><a href="screenshots/desktop-dark.png"><img src="screenshots/desktop-dark.png" alt="桌面深色课堂设计" loading="lazy"></a><a href="screenshots/mobile-dark.png"><img src="screenshots/mobile-dark.png" alt="手机深色课堂设计" loading="lazy"></a></div></section>
+  <section><h2>边界状态</h2><div class="pair"><a href="screenshots/desktop-states.png"><img src="screenshots/desktop-states.png" alt="桌面边界状态设计" loading="lazy"></a><a href="screenshots/mobile-states.png"><img src="screenshots/mobile-states.png" alt="手机边界状态设计" loading="lazy"></a></div></section>
+</body>
+</html>
