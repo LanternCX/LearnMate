@@ -21,6 +21,7 @@
 
 1. The main branch is protected. Contribute code through pull requests.
 2. Write commit messages in English and follow the Conventional Commits format.
+3. PR titles must follow Conventional Commits. Follow the PR template, fill in its required sections, and have a human complete its mandatory checklist before merging.
 
 ## Agent skills
 

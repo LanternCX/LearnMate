@@ -1,0 +1,28 @@
+name: PR template check
+
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-template-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: PR template check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Execute only trusted base-branch code, never code from the PR head.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          persist-credentials: false
+      - name: Test the validator
+        run: node --test .github/scripts/check-pr.test.cjs
+      - name: Validate PR title and body
+        run: node .github/scripts/check-pr.cjs

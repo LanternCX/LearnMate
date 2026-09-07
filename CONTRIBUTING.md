@@ -34,9 +34,13 @@ LearnMate 使用面向 AI 的协作环境（Harness）。[AGENTS.md](AGENTS.md) 
 
 完成约定范围的实现和验证后，按 [PR 模板](.github/pull_request_template.md) 提交 PR；有相关 Issue 时附上关联链接。
 
+PR 标题使用 Conventional Commits 格式，例如 `feat: add student onboarding` 或 `fix(classroom): restore lesson position`。
+
 - **说明**由人类撰写。
 - **概要**可以由 AI 生成，但必须由人类核对。
 - 提交者需要人工审核 PR 涉及的所有变更文件，并同步更新受影响的文档。
 - 根据实际完成情况勾选检查清单，再交由维护者审核。
+
+`PR template check` 会检查标题格式、模板必需章节、说明和概要是否填写，以及三个必选项是否全部勾选。自动检查只能确认填写情况，不能代替人工审核。
 
 编码 Agent 可以协助完成贡献，提交者仍需理解并对提交内容负责。
