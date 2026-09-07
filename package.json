@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "npm run dev --workspace @zhiya/client",
     "dev:desktop": "npm run tauri --workspace @zhiya/client -- dev",
-    "dev:server": "go -C apps/server run .",
+    "dev:server": "go -C apps/server run . -dev",
+    "dev:services": "docker compose up -d --wait",
     "build": "npm run build --workspace @zhiya/client",
     "build:desktop": "npm run tauri --workspace @zhiya/client -- build --no-bundle",
     "build:server": "go -C apps/server build -o ../../dist/server .",
     "check": "npm run check --workspace @zhiya/client",
-    "test": "go -C apps/server test ./... && node --test .github/scripts/check-pr.test.cjs"
+    "test": "go -C apps/server test ./... && node --test .github/scripts/check-pr.test.cjs",
+    "test:accounts": "TEST_DATABASE_URL=postgres://zhiya:zhiya-local@127.0.0.1:54329/zhiya?sslmode=disable go -C apps/server test -race ./...",
+    "test:e2e": "npm run test:e2e --workspace @zhiya/client"
   }
 }

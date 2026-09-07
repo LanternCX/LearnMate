@@ -5,3 +5,6 @@ node_modules/
 dist/
 /apps/client/src-tauri/target/
 /apps/client/src-tauri/gen/
+test-results/
+playwright-report/
+.env
