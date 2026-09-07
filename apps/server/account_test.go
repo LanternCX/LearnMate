@@ -1,0 +1,295 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"image"
+	"image/png"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type testApp struct {
+	t      *testing.T
+	server *httptest.Server
+	mail   map[string]string
+}
+
+func setupAccountTest(t *testing.T) *testApp {
+	t.Helper()
+	url := os.Getenv("TEST_DATABASE_URL")
+	if url == "" {
+		t.Skip("set TEST_DATABASE_URL to run PostgreSQL account behavior tests")
+	}
+	ctx := context.Background()
+	pool, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	schema := "account_test_" + strings.ReplaceAll(randomToken()[:24], "-", "")
+	if _, err = pool.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ConnConfig.RuntimeParams["search_path"] = schema
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Close(); _, _ = pool.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE"); pool.Close() })
+	if err := migrate(ctx, db); err != nil {
+		t.Fatal(err)
+	}
+	a := &testApp{t: t, mail: make(map[string]string)}
+	app := &accounts{db: db, send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
+	a.server = httptest.NewServer(app.handler())
+	t.Cleanup(a.server.Close)
+	return a
+}
+
+func (a *testApp) client() *http.Client {
+	jar, _ := cookiejar.New(nil)
+	return &http.Client{Jar: jar}
+}
+
+func (a *testApp) request(c *http.Client, method, path string, body any, status int) map[string]any {
+	a.t.Helper()
+	data, _ := json.Marshal(body)
+	req, _ := http.NewRequest(method, a.server.URL+"/api"+path, bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	req.Header.Set("Origin", a.server.URL)
+	res, err := c.Do(req)
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode != status {
+		a.t.Fatalf("%s %s = %d %s; want %d", method, path, res.StatusCode, raw, status)
+	}
+	var result map[string]any
+	if len(raw) > 0 {
+		if err := json.Unmarshal(raw, &result); err != nil {
+			a.t.Fatalf("invalid JSON: %s", raw)
+		}
+	}
+	return result
+}
+
+const testPassword = "A-long-test-password-123"
+
+func (a *testApp) register(email string) *http.Client {
+	a.t.Helper()
+	c := a.client()
+	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": email}, 200)["flow"].(string)
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": a.mail[email+":register"], "password": testPassword}, 200)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": email, "password": testPassword}, 200)
+	return c
+}
+
+func TestVerifiedRegistrationAndLogin(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.client()
+	a.request(c, "GET", "/me", nil, 401)
+	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": "learner@example.com"}, 200)["flow"].(string)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "learner@example.com", "password": testPassword}, 401)
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": "wrong", "password": testPassword}, 400)
+	code := a.mail["learner@example.com:register"]
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": testPassword}, 200)
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": testPassword}, 400)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "learner@example.com", "password": testPassword}, 200)
+	me := a.request(c, "GET", "/me", nil, 200)
+	if me["email"] != "learner@example.com" || me["nickname"] != "学习者" {
+		t.Fatal(fmt.Sprint(me))
+	}
+}
+
+func TestPasswordRecoveryAndSessionRevocation(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("recovery@example.com")
+	other := a.client()
+	a.request(other, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": testPassword}, 200)
+	a.request(c, "POST", "/auth/logout", map[string]string{}, 200)
+	a.request(c, "GET", "/me", nil, 401)
+	a.request(other, "GET", "/me", nil, 200)
+	a.request(other, "POST", "/auth/logout-all", map[string]string{}, 200)
+	a.request(other, "GET", "/me", nil, 401)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": testPassword}, 200)
+	a.request(other, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": testPassword}, 200)
+	a.request(c, "PUT", "/me/password", map[string]string{"currentPassword": "incorrect", "password": "a-new-long-password-123"}, 400)
+	a.request(c, "PUT", "/me/password", map[string]string{"currentPassword": testPassword, "password": "a-new-long-password-123"}, 200)
+	a.request(c, "GET", "/me", nil, 401)
+	a.request(other, "GET", "/me", nil, 401)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": testPassword}, 401)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": "a-new-long-password-123"}, 200)
+	flow := a.request(other, "POST", "/auth/reset/start", map[string]string{"email": "recovery@example.com"}, 200)["flow"].(string)
+	a.request(other, "POST", "/auth/reset/complete", map[string]string{"flow": flow, "code": a.mail["recovery@example.com:reset"], "password": "a-recovered-password-123"}, 200)
+	a.request(c, "GET", "/me", nil, 401)
+	a.request(other, "POST", "/auth/login", map[string]string{"email": "recovery@example.com", "password": "a-recovered-password-123"}, 200)
+}
+
+func TestProfileAvatarAndDataIsolation(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("profile@example.com")
+	other := a.register("other@example.com")
+	a.request(c, "PATCH", "/me", map[string]string{"nickname": "小芽", "id": "someone-else"}, 400)
+	a.request(c, "PATCH", "/me", map[string]string{"nickname": "小芽"}, 200)
+	me := a.request(c, "GET", "/me", nil, 200)
+	if me["nickname"] != "小芽" {
+		t.Fatal(me)
+	}
+	if a.request(other, "GET", "/me", nil, 200)["nickname"] != "学习者" {
+		t.Fatal("another account was modified")
+	}
+	a.request(c, "PUT", "/me/avatar", map[string]string{"avatar": "data:image/svg+xml;base64,PHN2Zy8+"}, 400)
+	var imageData bytes.Buffer
+	_ = png.Encode(&imageData, image.NewNRGBA(image.Rect(0, 0, 2, 2)))
+	avatar := "data:image/png;base64," + base64.StdEncoding.EncodeToString(imageData.Bytes())
+	a.request(c, "PUT", "/me/avatar", map[string]string{"avatar": avatar}, 200)
+	if a.request(c, "GET", "/me", nil, 200)["avatar"] == "" {
+		t.Fatal("avatar not saved")
+	}
+	if a.request(other, "GET", "/me", nil, 200)["avatar"] != "" {
+		t.Fatal("avatar leaked")
+	}
+	a.request(c, "PUT", "/me/avatar", map[string]string{"avatar": ""}, 200)
+	if a.request(c, "GET", "/me", nil, 200)["avatar"] != "" {
+		t.Fatal("avatar not restored")
+	}
+}
+
+func TestEmailChangeAndAccountDeletion(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("old@example.com")
+	other := a.client()
+	a.request(other, "POST", "/auth/login", map[string]string{"email": "old@example.com", "password": testPassword}, 200)
+	before := a.request(c, "GET", "/me", nil, 200)
+	a.request(c, "PATCH", "/me", map[string]string{"nickname": "保留昵称"}, 200)
+	flow := a.request(c, "POST", "/me/email/start", map[string]string{"email": "new@example.com"}, 200)["flow"].(string)
+	oldCode, newCode := a.mail["old@example.com:email"], a.mail["new@example.com:email-new"]
+	a.request(c, "POST", "/me/email/complete", map[string]string{"flow": flow, "code": oldCode, "newCode": "wrong"}, 400)
+	if a.request(c, "GET", "/me", nil, 200)["email"] != "old@example.com" {
+		t.Fatal("unverified email changed")
+	}
+	a.request(c, "POST", "/me/email/complete", map[string]string{"flow": flow, "code": oldCode, "newCode": newCode}, 200)
+	after := a.request(c, "GET", "/me", nil, 200)
+	if after["id"] != before["id"] || after["nickname"] != "保留昵称" || after["email"] != "new@example.com" {
+		t.Fatal(after)
+	}
+	a.request(a.client(), "POST", "/auth/login", map[string]string{"email": "old@example.com", "password": testPassword}, 401)
+	a.request(a.client(), "POST", "/auth/login", map[string]string{"email": "new@example.com", "password": testPassword}, 200)
+	a.request(c, "DELETE", "/me", map[string]any{"currentPassword": testPassword, "confirm": false}, 400)
+	a.request(c, "DELETE", "/me", map[string]any{"currentPassword": "wrong", "confirm": true}, 400)
+	a.request(c, "DELETE", "/me", map[string]any{"currentPassword": testPassword, "confirm": true}, 200)
+	a.request(c, "GET", "/me", nil, 401)
+	a.request(other, "GET", "/me", nil, 401)
+	a.request(a.client(), "POST", "/auth/login", map[string]string{"email": "new@example.com", "password": testPassword}, 401)
+	fresh := a.register("new@example.com")
+	if a.request(fresh, "GET", "/me", nil, 200)["id"] == before["id"] {
+		t.Fatal("deleted identity was restored")
+	}
+}
+
+func TestVerificationAttemptsAndPurposeAreEnforced(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.client()
+	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": "attempts@example.com"}, 200)["flow"].(string)
+	code := a.mail["attempts@example.com:register"]
+	for i := 0; i < 5; i++ {
+		a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": "wrong", "password": testPassword}, 400)
+	}
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": testPassword}, 400)
+	c = a.register("owner@example.com")
+	other := a.register("outsider@example.com")
+	flow = a.request(c, "POST", "/me/email/start", map[string]string{"email": "replacement@example.com"}, 200)["flow"].(string)
+	codes := map[string]string{"flow": flow, "code": a.mail["owner@example.com:email"], "newCode": a.mail["replacement@example.com:email-new"]}
+	a.request(other, "POST", "/me/email/complete", codes, 400)
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": codes["code"], "password": testPassword}, 400)
+	a.request(c, "POST", "/me/email/complete", codes, 200)
+}
+
+func TestCrossSiteRequestsCannotModifyAccount(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("csrf@example.com")
+	for _, origin := range []string{"https://evil.example", a.server.URL} {
+		req, _ := http.NewRequest("PATCH", a.server.URL+"/api/me", strings.NewReader(`{"nickname":"attacker"}`))
+		req.Header.Set("Origin", origin)
+		req.Header.Set("Content-Type", "application/json")
+		if origin != a.server.URL {
+			req.Header.Set("X-Zhiya-Request", "1")
+		}
+		response, err := c.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 403 {
+			t.Fatalf("cross-site/missing-header request = %d", response.StatusCode)
+		}
+	}
+	if a.request(c, "GET", "/me", nil, 200)["nickname"] != "学习者" {
+		t.Fatal("cross-site modification succeeded")
+	}
+}
+
+func TestStalePageCannotModifyAnotherSignedInAccount(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("stale@example.com")
+	oldID := a.request(c, "GET", "/me", nil, 200)["id"].(string)
+	other := a.register("active@example.com")
+	req, _ := http.NewRequest("PATCH", a.server.URL+"/api/me", strings.NewReader(`{"nickname":"stale edit"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	req.Header.Set("X-Zhiya-User", oldID)
+	response, err := other.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 401 {
+		t.Fatalf("stale page update = %d; want 401", response.StatusCode)
+	}
+	if a.request(other, "GET", "/me", nil, 200)["nickname"] != "学习者" {
+		t.Fatal("stale page modified another account")
+	}
+}
+
+func TestRegistrationCodeCanOnlyBeConsumedOnceConcurrently(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.client()
+	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": "concurrent@example.com"}, 200)["flow"].(string)
+	payload, _ := json.Marshal(map[string]string{"flow": flow, "code": a.mail["concurrent@example.com:register"], "password": testPassword})
+	results := make(chan int, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			req, _ := http.NewRequest("POST", a.server.URL+"/api/auth/register/complete", bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Zhiya-Request", "1")
+			response, err := c.Do(req)
+			if err != nil {
+				results <- 0
+				return
+			}
+			response.Body.Close()
+			results <- response.StatusCode
+		}()
+	}
+	first, second := <-results, <-results
+	if !((first == 200 && second == 400) || (first == 400 && second == 200)) {
+		t.Fatalf("concurrent completions = %d, %d", first, second)
+	}
+}
