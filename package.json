@@ -1,0 +1,16 @@
+{
+  "name": "zhiya",
+  "private": true,
+  "workspaces": ["apps/client"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "npm run dev --workspace @zhiya/client",
+    "dev:desktop": "npm run tauri --workspace @zhiya/client -- dev",
+    "dev:server": "go -C apps/server run .",
+    "build": "npm run build --workspace @zhiya/client",
+    "build:desktop": "npm run tauri --workspace @zhiya/client -- build --no-bundle",
+    "build:server": "go -C apps/server build -o ../../dist/server .",
+    "check": "npm run check --workspace @zhiya/client",
+    "test": "go -C apps/server test ./... && node --test .github/scripts/check-pr.test.cjs"
+  }
+}

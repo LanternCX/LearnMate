@@ -16,7 +16,35 @@
 
 ## 项目状态
 
-项目处于需求整理与初始化阶段，尚无可运行的应用。上述内容为产品规划，具体需求、约束和待明确事项以 [总需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3) 的正文为准。
+应用骨架提供 React 占位页面、Tauri 桌面入口和 Go 健康检查服务。上述业务功能为产品规划，具体需求、约束和待明确事项以 [总需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3) 的正文为准。
+
+## 本地开发
+
+需要 Node.js 22.12+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
+
+```sh
+npm install
+```
+
+按需要在独立终端运行：
+
+```sh
+npm run dev          # 浏览器：http://127.0.0.1:1420
+npm run dev:desktop  # Tauri 桌面窗口，自行启动前端；与 dev 二选一
+npm run dev:server   # Go：http://127.0.0.1:8080/health
+```
+
+前端和后端独立启动，占位页面不依赖后端。健康检查返回 `ok`。
+
+```sh
+npm run check          # TypeScript 检查
+npm test               # Go 行为测试与已有 PR 模板检查测试
+npm run build          # 前端构建
+npm run build:server   # 后端构建，输出到 dist/server
+npm run build:desktop  # 桌面可执行文件构建，不制作安装包
+```
+
+移动端平台工程、签名与发行配置在确定支持平台后接入。
 
 ## 文档与协作
 

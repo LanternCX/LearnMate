@@ -1,3 +1,7 @@
 .DS_Store
 /docs/design/screenshots/
 /docs/design/*.pdf
+node_modules/
+dist/
+/apps/client/src-tauri/target/
+/apps/client/src-tauri/gen/
