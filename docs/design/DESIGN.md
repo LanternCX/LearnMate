@@ -1,12 +1,12 @@
-# LearnMate Design Guidelines
+# Zhiya Design Guidelines
 
 ## Sources and scope
 
 Design a calm, trustworthy learning space where K12 students can ask questions at any time. Every screen should make clear what the student is learning, what they can do, and how to continue.
 
-- The body of [PRD #3](https://github.com/LanternCX/LearnMate/issues/3) owns product requirements. [Technology selection #2](https://github.com/LanternCX/LearnMate/issues/2) owns technical constraints. This document defines visual and interaction guidelines; it does not duplicate requirements or determine implementation scope.
-- The [UI references in the PRD discussion](https://github.com/LanternCX/LearnMate/issues/3#issuecomment-5555035574) inform sage light and graphite dark palettes, Chinese serif headings, an open teaching canvas, and question states that preserve the lesson position. The visual direction defined here uses stronger depth and frosted-glass navigation and controls; the references are not a pixel-for-pixel template.
-- Use [Vercel design.md](https://vercel.com/design.md) only as a reference for organizing a usable design guide. Its aesthetic restrictions, including its rejection of glass effects, are not LearnMate requirements. Derive visual rules from the learning experience and the user's design direction.
+- The body of [PRD #3](https://github.com/LanternCX/zhiya/issues/3) owns product requirements. [Technology selection #2](https://github.com/LanternCX/zhiya/issues/2) owns technical constraints. This document defines visual and interaction guidelines; it does not duplicate requirements or determine implementation scope.
+- The [UI references in the PRD discussion](https://github.com/LanternCX/zhiya/issues/3#issuecomment-5555035574) inform sage light and graphite dark palettes, Chinese serif headings, an open teaching canvas, and question states that preserve the lesson position. The visual direction defined here uses stronger depth and frosted-glass navigation and controls; the references are not a pixel-for-pixel template.
+- Use [Vercel design.md](https://vercel.com/design.md) only as a reference for organizing a usable design guide. Its aesthetic restrictions, including its rejection of glass effects, are not Zhiya requirements. Derive visual rules from the learning experience and the user's design direction.
 - Apply `frontend-design` to strengthen composition and craft. Product constraints and the supplied references take priority over generic stylistic suggestions.
 - Colors, type sizes, and layout dimensions below are design choices informed by the references, not claimed source values extracted from the images. Example lessons, students, and learning records illustrate the interface; they do not confirm launch content or assessment algorithms.
 

@@ -1,8 +1,8 @@
-# LearnMate
+# 知芽 Zhiya
 
 面向小学至高中学生的个性化 AI 学习搭子，帮助学生学习编程与人工智能通识知识。
 
-LearnMate 希望通过持续了解学生的知识基础、兴趣与学习表现，调整教学内容、讲解方式和学习路径，让每一次提问、练习与实践都能帮助安排下一步学习。
+知芽 希望通过持续了解学生的知识基础、兴趣与学习表现，调整教学内容、讲解方式和学习路径，让每一次提问、练习与实践都能帮助安排下一步学习。
 
 ## 产品方向
 
@@ -16,11 +16,11 @@ LearnMate 希望通过持续了解学生的知识基础、兴趣与学习表现�
 
 ## 项目状态
 
-项目处于需求整理与初始化阶段，尚无可运行的应用。上述内容为产品规划，具体需求、约束和待明确事项以 [总需求 Issue #3](https://github.com/LanternCX/LearnMate/issues/3) 的正文为准。
+项目处于需求整理与初始化阶段，尚无可运行的应用。上述内容为产品规划，具体需求、约束和待明确事项以 [总需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3) 的正文为准。
 
 ## 文档与协作
 
-- [总需求 Issue #3](https://github.com/LanternCX/LearnMate/issues/3)：维护本轮开发的产品目标、学习场景、设计约束与验收场景；完成验收后关闭归档。
-- [技术选型 Issue #2](https://github.com/LanternCX/LearnMate/issues/2)：查阅已确认的技术栈、职责边界与待定项。
+- [总需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3)：维护本轮开发的产品目标、学习场景、设计约束与验收场景；完成验收后关闭归档。
+- [技术选型 Issue #2](https://github.com/LanternCX/zhiya/issues/2)：查阅已确认的技术栈、职责边界与待定项。
 - [开发约定](AGENTS.md)：参与开发前阅读的项目规则。
 - [Reference Sync](.agents/skills/reference-sync/SKILL.md)：用于查阅、核对和更新项目需求文档的技能说明。
