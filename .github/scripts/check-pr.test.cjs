@@ -63,7 +63,7 @@ test('reads required headings and checklist items from the template', () => {
 });
 
 test('the workflow entry point returns success or failure for a GitHub event', () => {
-  const directory = mkdtempSync(join(tmpdir(), 'learnmate-pr-check-'));
+  const directory = mkdtempSync(join(tmpdir(), 'zhiya-pr-check-'));
   const eventPath = join(directory, 'event.json');
   try {
     for (const [text, status] of [[body, 0], [template, 1], [null, 1]]) {

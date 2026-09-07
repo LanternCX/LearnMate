@@ -1,6 +1,6 @@
 ---
 name: reference-sync
-description: Consult, check, or update LearnMate's competition requirements and GitHub product requirements issue. Use for requirements alignment and source consistency checks, not product implementation.
+description: Consult, check, or update Zhiya's competition requirements and GitHub product requirements issue. Use for requirements alignment and source consistency checks, not product implementation.
 ---
 
 # Reference Sync
@@ -15,12 +15,12 @@ Competition requirements live in the repository. Product requirements live only 
 | --- | --- | --- |
 | [competition.md](reference/competition.md) | `docs/competition.md` | JBGS-2026-02 requirements, shared track rules, scoring, and support. |
 | [DESIGN.md](reference/DESIGN.md) | `docs/design/DESIGN.md` | Visual and interaction guidelines; product requirements remain in issue #3. |
-| [Product requirements issue #3](https://github.com/LanternCX/LearnMate/issues/3) | GitHub issue body | Product goals, scenarios, requirements, design constraints, acceptance checks, and open questions. |
-| [Technology selection issue #2](https://github.com/LanternCX/LearnMate/issues/2) | GitHub issue body | Confirmed technology choices, responsibility boundaries, and unresolved technical decisions. |
+| [Product requirements issue #3](https://github.com/LanternCX/zhiya/issues/3) | GitHub issue body | Product goals, scenarios, requirements, design constraints, acceptance checks, and open questions. |
+| [Technology selection issue #2](https://github.com/LanternCX/zhiya/issues/2) | GitHub issue body | Confirmed technology choices, responsibility boundaries, and unresolved technical decisions. |
 
 ## Workflow
 
-1. Read competition requirements through `reference/competition.md` and confirm that the link resolves to `docs/competition.md`. Read the product requirements with `gh issue view 3 --repo LanternCX/LearnMate --json body,comments,labels`; read issue #2 the same way when technical context matters. If GitHub is unavailable, report the limitation rather than treating a local copy as authoritative.
+1. Read competition requirements through `reference/competition.md` and confirm that the link resolves to `docs/competition.md`. Read the product requirements with `gh issue view 3 --repo LanternCX/zhiya --json body,comments,labels`; read issue #2 the same way when technical context matters. If GitHub is unavailable, report the limitation rather than treating a local copy as authoritative.
 2. Keep the competition scope limited to topic 2, the multimodal K12 AI literacy teaching assistant conversational agent, identified by `JBGS-2026-02`, plus applicable shared track rules.
 3. For a check request, report inconsistencies or gaps without editing. For an update request, apply confirmed competition changes directly to the canonical Markdown file. Update confirmed product requirements in issue #3's body using `gh issue edit --body-file`, preserving unrelated content. Temporary transport files must stay outside the repository and be removed after verification; they are not maintained mirrors.
 4. Preserve the distinction between official competition requirements, product decisions, derived acceptance checks, and open questions. Do not turn an unresolved gap into a confirmed feature. Ask the user to resolve conflicting requirements when needed.

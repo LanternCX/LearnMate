@@ -6,11 +6,11 @@
 
 可以让 AI 帮你写代码，但不能把自己都没看懂的生成结果直接交上来。
 
-使用编码 Agent 时，请在 LearnMate 根目录下启动，并确保它读取并遵守 `AGENTS.md` 中的项目约定。
+使用编码 Agent 时，请在 知芽 根目录下启动，并确保它读取并遵守 `AGENTS.md` 中的项目约定。
 
 ## 通过编码 Agent 协作
 
-LearnMate 使用面向 AI 的协作环境（Harness）。[AGENTS.md](AGENTS.md) 和 [.agents/](.agents/) 为编码 Agent 提供项目规则、技能和上下文入口。
+知芽 使用面向 AI 的协作环境（Harness）。[AGENTS.md](AGENTS.md) 和 [.agents/](.agents/) 为编码 Agent 提供项目规则、技能和上下文入口。
 
 建议以项目根目录作为工作目录，在 Codex 等编码 Agent 中打开项目，通过 Agent 讨论需求、完成实现和验证。开始前，让 Agent 阅读并遵守 `AGENTS.md`。
 
@@ -26,7 +26,7 @@ LearnMate 使用面向 AI 的协作环境（Harness）。[AGENTS.md](AGENTS.md) 
 
 所有贡献都应通过 Issue 或 PR 留下可追踪的讨论、改动范围和进度。有相关 Issue 时关联已有 Issue；也可以直接提交 PR，说明改动的目的与内容。无需为每一次改动单独创建 Issue。
 
-需要先讨论的功能或问题，可以使用 [Issue 模板](https://github.com/LanternCX/LearnMate/issues/new/choose) 发起讨论，再根据确认的范围实现。模板提供简短的用途说明，内容以把事情说清楚为准。由 Agent 发布或更新这些内容时，同样必须先获得人类授权。
+需要先讨论的功能或问题，可以使用 [Issue 模板](https://github.com/LanternCX/zhiya/issues/new/choose) 发起讨论，再根据确认的范围实现。模板提供简短的用途说明，内容以把事情说清楚为准。由 Agent 发布或更新这些内容时，同样必须先获得人类授权。
 
 使用对应模板的标题前缀和类型标签。需求与技术依据、开发和提交约定统一见 [AGENTS.md](AGENTS.md)。
 
