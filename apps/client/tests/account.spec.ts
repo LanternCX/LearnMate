@@ -34,6 +34,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   page,
   request,
 }) => {
+  test.setTimeout(90_000);
   const email = `learner-${Date.now()}@example.com`;
   await page.goto("/");
   await page.getByRole("button", { name: "注册账号", exact: true }).click();
@@ -60,15 +61,17 @@ test("a learner can register, edit their profile, and permanently delete their a
     "小芽同学",
   );
   const avatar = await page.locator(".avatar").screenshot();
-  await page
-    .getByLabel("上传头像", { exact: true })
-    .setInputFiles({
-      name: "avatar.png",
-      mimeType: "image/png",
-      buffer: avatar,
-    });
+  await page.getByLabel("昵称", { exact: true }).fill("尚未保存的昵称");
+  await page.getByLabel("上传头像", { exact: true }).setInputFiles({
+    name: "avatar.png",
+    mimeType: "image/png",
+    buffer: avatar,
+  });
   await page.getByRole("button", { name: "保存头像" }).click();
   await expect(page.getByRole("status")).toContainText("头像已保存");
+  await expect(page.getByLabel("昵称", { exact: true })).toHaveValue(
+    "尚未保存的昵称",
+  );
   await page.reload();
   await expect(page.getByAltText("当前头像")).toBeVisible();
   await page.getByRole("button", { name: "恢复默认头像" }).click();

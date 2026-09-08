@@ -3,8 +3,7 @@ use reqwest::{blocking::Client, header, Method};
 use serde::Serialize;
 use std::{sync::Mutex, time::Duration};
 
-// ponytail: serialize account requests in one window; use per-session locks if parallel account work is needed.
-static REQUEST_LOCK: Mutex<()> = Mutex::new(());
+static ACCOUNT_REQUEST_LOCK: Mutex<()> = Mutex::new(());
 
 #[derive(Serialize)]
 pub struct Response {
@@ -48,28 +47,10 @@ fn request(
     if cfg!(target_os = "android") {
         return Err("Android secure credential storage must be configured before use".into());
     }
-    let _guard = REQUEST_LOCK
+    let _guard = ACCOUNT_REQUEST_LOCK
         .lock()
         .map_err(|_| "Account request unavailable")?;
-    let base = option_env!("ZHIYA_API_URL").unwrap_or(if cfg!(debug_assertions) {
-        "http://127.0.0.1:8080"
-    } else {
-        ""
-    });
-    let url =
-        reqwest::Url::parse(base).map_err(|_| "Set ZHIYA_API_URL when building the application")?;
-    let local = cfg!(debug_assertions)
-        && url.scheme() == "http"
-        && matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"));
-    if (!local && url.scheme() != "https")
-        || url.path() != "/"
-        || url.query().is_some()
-        || url.fragment().is_some()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return Err("ZHIYA_API_URL must be an HTTPS origin".into());
-    }
+    let base = api_origin()?;
     let entry = Entry::new("com.lanterncx.zhiya.session", base)
         .map_err(|_| "Secure storage unavailable")?;
     let token = match entry.get_password() {
@@ -102,7 +83,43 @@ fn request(
         .send()
         .map_err(|_| "Unable to connect to account server")?;
     let status = response.status().as_u16();
-    for cookie in response.headers().get_all(header::SET_COOKIE) {
+    store_session(&entry, &client, base, response.headers())?;
+    let body = response
+        .text()
+        .map_err(|_| "Unable to read account response")?;
+    Ok(Response { status, body })
+}
+
+fn api_origin() -> Result<&'static str, String> {
+    let base = option_env!("ZHIYA_API_URL").unwrap_or(if cfg!(debug_assertions) {
+        "http://127.0.0.1:8080"
+    } else {
+        ""
+    });
+    let url =
+        reqwest::Url::parse(base).map_err(|_| "Set ZHIYA_API_URL when building the application")?;
+    let local = cfg!(debug_assertions)
+        && url.scheme() == "http"
+        && matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"));
+    if (!local && url.scheme() != "https")
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("ZHIYA_API_URL must be an HTTPS origin".into());
+    }
+    Ok(base)
+}
+
+fn store_session(
+    entry: &Entry,
+    client: &Client,
+    base: &str,
+    headers: &header::HeaderMap,
+) -> Result<(), String> {
+    for cookie in headers.get_all(header::SET_COOKIE) {
         let value = cookie.to_str().map_err(|_| "Invalid session response")?;
         if let Some(value) = value.strip_prefix("zhiya_session=") {
             let value = value.split(';').next().unwrap_or("");
@@ -128,10 +145,7 @@ fn request(
             }
         }
     }
-    let body = response
-        .text()
-        .map_err(|_| "Unable to read account response")?;
-    Ok(Response { status, body })
+    Ok(())
 }
 
 #[tauri::command]

@@ -20,6 +20,13 @@
 
 ## 本地开发
 
+代码按客户端与服务端组织：
+
+- `apps/client/src/App.tsx`：页面布局、导航与连接状态。
+- `apps/client/src/account/`：账号状态、注册登录、个人资料和安全设置。
+- `apps/client/src/components/`：品牌、主题、背景和确认弹窗等公共控件。
+- `apps/client/src/api.ts` 与 `apps/client/src-tauri/src/account.rs`：浏览器及桌面请求、会话隔离与系统凭证存储。
+
 需要 Node.js 22.12+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
 
 ```sh

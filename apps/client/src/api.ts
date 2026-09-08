@@ -7,8 +7,10 @@ export type User = {
   avatar: string;
 };
 let activeUser = "";
+let sessionRevision = 0;
 export function setActiveUser(id: string) {
   activeUser = id;
+  sessionRevision++;
 }
 export class APIError extends Error {
   constructor(
@@ -25,6 +27,7 @@ export async function api<T = { ok: boolean }>(
   body?: object,
 ): Promise<T> {
   const expectedUser = activeUser;
+  const expectedRevision = sessionRevision;
   let status: number;
   let text: string;
   try {
@@ -63,7 +66,7 @@ export async function api<T = { ok: boolean }>(
     throw new APIError(0, "暂时无法连接，请检查网络后重试。");
   }
   let data;
-  if (expectedUser !== activeUser)
+  if (expectedRevision !== sessionRevision)
     throw new APIError(409, "账号已切换，请重新操作。");
   try {
     data = JSON.parse(text);
