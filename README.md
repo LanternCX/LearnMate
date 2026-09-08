@@ -26,6 +26,9 @@
 - `apps/client/src/account/`：账号状态、注册登录、个人资料和安全设置。
 - `apps/client/src/components/`：品牌、主题、背景和确认弹窗等公共控件。
 - `apps/client/src/api.ts` 与 `apps/client/src-tauri/src/account.rs`：浏览器及桌面请求、会话隔离与系统凭证存储。
+- `apps/server/cmd/api/`：服务启动、路由、中间件和账户请求处理，以及 HTTP 行为测试。
+- `apps/server/internal/data/`：用户、会话与验证码的数据操作，管理数据库结构和事务。
+- `apps/server/internal/mailer/`：邮件投递。
 
 需要 Node.js 22.12+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/data"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -36,7 +38,7 @@ func setupAccountTest(t *testing.T) *testApp {
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := "account_test_" + strings.ReplaceAll(randomToken()[:24], "-", "")
+	schema := "account_test_" + strings.ReplaceAll(rand.Text()[:24], "-", "")
 	if _, err = pool.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		t.Fatal(err)
 	}
@@ -50,12 +52,12 @@ func setupAccountTest(t *testing.T) *testApp {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close(); _, _ = pool.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE"); pool.Close() })
-	if err := migrate(ctx, db); err != nil {
+	if err := data.NewModels(db).Initialize(ctx); err != nil {
 		t.Fatal(err)
 	}
 	a := &testApp{t: t, mail: make(map[string]string)}
-	app := &accounts{db: db, send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
-	a.server = httptest.NewServer(app.handler())
+	app := &application{models: data.NewModels(db), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
+	a.server = httptest.NewServer(app.routes())
 	t.Cleanup(a.server.Close)
 	return a
 }
@@ -291,5 +293,13 @@ func TestRegistrationCodeCanOnlyBeConsumedOnceConcurrently(t *testing.T) {
 	first, second := <-results, <-results
 	if !((first == 200 && second == 400) || (first == 400 && second == 200)) {
 		t.Fatalf("concurrent completions = %d, %d", first, second)
+	}
+}
+
+func TestHealth(t *testing.T) {
+	response := httptest.NewRecorder()
+	(&application{}).routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/health", nil))
+	if response.Code != http.StatusOK || response.Body.String() != "ok\n" {
+		t.Fatalf("GET /health = %d %q; want 200 and ok", response.Code, response.Body.String())
 	}
 }

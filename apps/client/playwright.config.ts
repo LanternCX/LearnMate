@@ -14,7 +14,7 @@ export default defineConfig({
       reuseExistingServer: true,
     },
     {
-      command: "go -C ../server run . -dev",
+      command: "go -C ../server run ./cmd/api -dev",
       url: "http://127.0.0.1:8080/health",
       reuseExistingServer: true,
     },

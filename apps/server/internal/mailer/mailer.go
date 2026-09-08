@@ -1,4 +1,4 @@
-package main
+package mailer
 
 import (
 	"crypto/tls"
@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func smtpSender(address, from, username, password string, local bool) (func(string, string, string) error, error) {
+func New(address, from, username, password string, local bool) (func(string, string, string) error, error) {
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("SMTP_ADDR: %w", err)

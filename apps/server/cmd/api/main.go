@@ -11,8 +11,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/data"
+	"github.com/LanternCX/zhiya/apps/server/internal/mailer"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+type application struct {
+	models data.Models
+	send   func(to, purpose, code string) error
+	secure bool
+	origin string
+	web    string
+}
 
 func env(name, fallback string) string {
 	if value := os.Getenv(name); value != "" {
@@ -39,12 +49,6 @@ func main() {
 		log.Fatal("invalid database configuration")
 	}
 	defer db.Close()
-	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
-	err = migrate(startup, db)
-	cancel()
-	if err != nil {
-		log.Fatal("database initialization failed: ", err)
-	}
 	origin := env("APP_ORIGIN", "http://127.0.0.1:1420")
 	parsed, err := url.Parse(origin)
 	if err != nil || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil || (!*dev && parsed.Scheme != "https") {
@@ -55,22 +59,20 @@ func main() {
 		address = env("SMTP_ADDR", "127.0.0.1:1025")
 		from = env("SMTP_FROM", "Zhiya <noreply@zhiya.local>")
 	}
-	send, err := smtpSender(address, from, os.Getenv("SMTP_USER"), os.Getenv("SMTP_PASSWORD"), *dev)
+	send, err := mailer.New(address, from, os.Getenv("SMTP_USER"), os.Getenv("SMTP_PASSWORD"), *dev)
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := &accounts{db: db, send: send, secure: !*dev, origin: origin}
-	mux := http.NewServeMux()
-	mux.Handle("/api/", app.handler())
-	mux.Handle("/health", app.handler())
-	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		http.FileServer(http.Dir(*web)).ServeHTTP(w, r)
-	}))
+	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
+	app := &application{models: data.NewModels(db), send: send, secure: !*dev, origin: origin, web: *web}
+	err = app.models.Initialize(startup)
+	cancel()
+	if err != nil {
+		log.Fatal("database initialization failed: ", err)
+	}
 	server := &http.Server{
 		Addr:              env("LISTEN_ADDR", "127.0.0.1:8080"),
-		Handler:           mux,
+		Handler:           app.routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -87,7 +89,7 @@ func main() {
 				_ = server.Shutdown(shutdown)
 				return
 			case <-ticker.C:
-				_, err := db.Exec(ctx, "DELETE FROM challenges WHERE expires_at<now(); DELETE FROM sessions WHERE expires_at<now(); DELETE FROM auth_limits WHERE expires_at<now()")
+				err := app.models.Tokens.CleanupExpired(ctx)
 				if err != nil {
 					log.Print("expired account data cleanup failed")
 				}
