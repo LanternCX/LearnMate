@@ -16,7 +16,9 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/LanternCX/zhiya/apps/server/internal/data"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,10 +31,19 @@ type testApp struct {
 
 func setupAccountTest(t *testing.T) *testApp {
 	t.Helper()
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set TEST_DATABASE_URL to run PostgreSQL account behavior tests")
+	if os.Getenv("ZHIYA_TEST_DATABASE") != "1" {
+		t.Skip("run npm run test:accounts to enable PostgreSQL behavior tests")
 	}
+	configPath := os.Getenv("ZHIYA_SERVER_CONFIG")
+	if configPath == "" {
+		configPath = "../../config.yaml"
+	}
+	settings, err := config.Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	url := settings.Database.URL
+	settings.Server.Origin = ""
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, url)
 	if err != nil {
@@ -52,11 +63,11 @@ func setupAccountTest(t *testing.T) *testApp {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { db.Close(); _, _ = pool.Exec(ctx, "DROP SCHEMA "+schema+" CASCADE"); pool.Close() })
-	if err := data.NewModels(db).Initialize(ctx); err != nil {
+	if err := data.NewModels(db, settings.Account).Initialize(ctx); err != nil {
 		t.Fatal(err)
 	}
 	a := &testApp{t: t, mail: make(map[string]string)}
-	app := &application{models: data.NewModels(db), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
+	app := &application{config: settings, models: data.NewModels(db, settings.Account), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
 	a.server = httptest.NewServer(app.routes())
 	t.Cleanup(a.server.Close)
 	return a
@@ -302,4 +313,98 @@ func TestHealth(t *testing.T) {
 	if response.Code != http.StatusOK || response.Body.String() != "ok\n" {
 		t.Fatalf("GET /health = %d %q; want 200 and ok", response.Code, response.Body.String())
 	}
+}
+
+func TestConfiguredRateLimitAndRetryAfter(t *testing.T) {
+	t.Setenv("ZHIYA_SERVER_ACCOUNT_IP_LIMIT", "1")
+	t.Setenv("ZHIYA_SERVER_ACCOUNT_RATE_WINDOW_SECONDS", "7")
+	a := setupAccountTest(t)
+	c := a.client()
+	a.request(c, "POST", "/auth/register/start", map[string]string{"email": "limit@example.com"}, 200)
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/auth/register/start", strings.NewReader(`{"email":"second@example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	response, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 429 || response.Header.Get("Retry-After") != "7" {
+		t.Fatalf("configured limit = %d, Retry-After %q; want 429 and 7", response.StatusCode, response.Header.Get("Retry-After"))
+	}
+}
+
+func TestConfiguredSessionExpiresEvenWhenCookieIsReplayed(t *testing.T) {
+	t.Setenv("ZHIYA_SERVER_ACCOUNT_SESSION_TTL_SECONDS", "1")
+	a := setupAccountTest(t)
+	a.register("session-expiry@example.com")
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/auth/login", strings.NewReader(`{"email":"session-expiry@example.com","password":"`+testPassword+`"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	c := a.client()
+	response, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	cookies := response.Cookies()
+	if response.StatusCode != 200 || len(cookies) != 1 || cookies[0].MaxAge != 1 {
+		t.Fatal("session cookie did not use configured lifetime")
+	}
+	fresh, _ := http.NewRequest("GET", a.server.URL+"/api/me", nil)
+	fresh.AddCookie(cookies[0])
+	response, err = (&http.Client{}).Do(fresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 200 {
+		t.Fatalf("new session already expired: %d", response.StatusCode)
+	}
+	time.Sleep(1100 * time.Millisecond)
+	replay, _ := http.NewRequest("GET", a.server.URL+"/api/me", nil)
+	replay.AddCookie(cookies[0])
+	response, err = (&http.Client{}).Do(replay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 401 {
+		t.Fatalf("expired session replay = %d; want 401", response.StatusCode)
+	}
+}
+
+func TestDeploymentConfigurationIsNotExposed(t *testing.T) {
+	response := httptest.NewRecorder()
+	(&application{}).routes().ServeHTTP(response, httptest.NewRequest("GET", "/api/config", nil))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/config = %d; want 404", response.Code)
+	}
+}
+
+func TestPublicAccountRulesMatchServerValidation(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.client()
+	rules := a.request(c, "GET", "/account-rules", nil, 200)
+	if len(rules) != 7 {
+		t.Fatal("unexpected fields in public account rules")
+	}
+	for _, field := range []string{"password_min_characters", "password_max_bytes", "nickname_max_characters", "avatar_max_bytes", "avatar_max_dimension", "verification_code_digits", "verification_ttl_seconds"} {
+		if _, ok := rules[field].(float64); !ok {
+			t.Fatalf("missing public rule %s", field)
+		}
+	}
+	minPassword := int(rules["password_min_characters"].(float64))
+	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": "rules@example.com"}, 200)["flow"].(string)
+	code := a.mail["rules@example.com:register"]
+	if len(code) != int(rules["verification_code_digits"].(float64)) {
+		t.Fatal("code length disagrees with public rules")
+	}
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": strings.Repeat("a", minPassword-1)}, 400)
+	password := strings.Repeat("a", minPassword)
+	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": password}, 200)
+	a.request(c, "POST", "/auth/login", map[string]string{"email": "rules@example.com", "password": password}, 200)
+	maxNickname := int(rules["nickname_max_characters"].(float64))
+	a.request(c, "PATCH", "/me", map[string]string{"nickname": strings.Repeat("芽", maxNickname+1)}, 400)
+	a.request(c, "PATCH", "/me", map[string]string{"nickname": strings.Repeat("芽", maxNickname)}, 200)
 }

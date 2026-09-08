@@ -1,3 +1,4 @@
+import { usePolicy } from "./Policy";
 import { api } from "../api";
 import type { User } from "../api";
 import { Field, Form } from "./Form";
@@ -29,6 +30,7 @@ export default function Profile({
   nickname,
   setNickname,
 }: Props) {
+  const rules = usePolicy();
   const fileInput = useRef<HTMLInputElement>(null);
   const reader = useRef<FileReader | null>(null);
   useEffect(() => () => reader.current?.abort(), []);
@@ -57,10 +59,12 @@ export default function Profile({
               const file = event.target.files?.[0];
               if (!file) return;
               if (
-                file.size > 2 * 1024 * 1024 ||
+                file.size > rules.avatar_max_bytes ||
                 !["image/png", "image/jpeg"].includes(file.type)
               ) {
-                setError("请选择 2 MB 以内的 PNG 或 JPEG 图片。");
+                setError(
+                  `请选择 ${rules.avatar_max_bytes / (1024 * 1024)} MB 以内的 PNG 或 JPEG 图片。`,
+                );
                 event.target.value = "";
                 return;
               }
@@ -96,7 +100,9 @@ export default function Profile({
               </button>
             )}
           </div>
-          <p className="hint">PNG 或 JPEG，最大 2 MB，边长不超过 2048 像素。</p>
+          <p className="hint">
+            PNG 或 JPEG，最大 {rules.avatar_max_bytes / (1024 * 1024)} MB，边长不超过 {rules.avatar_max_dimension} 像素。
+          </p>
           {avatarDraft !== null && (
             <button
               className="primary"
@@ -132,7 +138,7 @@ export default function Profile({
           label="昵称"
           name="nickname"
           autoComplete="nickname"
-          maxLength={40}
+          maxLength={rules.nickname_max_characters}
           value={nickname}
           onChange={setNickname}
         />

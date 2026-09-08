@@ -36,13 +36,13 @@ func (a *application) startRegistration(w http.ResponseWriter, r *http.Request) 
 	var in struct {
 		Email string `json:"email"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	email, err := a.emailInput(r, in.Email, "mail:", 5)
+	email, err := a.emailInput(r, in.Email, "mail:", a.config.Account.MailLimit)
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	var flow string
@@ -59,7 +59,7 @@ func (a *application) startRegistration(w http.ResponseWriter, r *http.Request) 
 		return err
 	})
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	writeJSON(w, 200, map[string]string{"flow": flow})
@@ -68,13 +68,13 @@ func (a *application) startPasswordReset(w http.ResponseWriter, r *http.Request)
 	var in struct {
 		Email string `json:"email"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	email, err := a.emailInput(r, in.Email, "mail:", 5)
+	email, err := a.emailInput(r, in.Email, "mail:", a.config.Account.MailLimit)
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	var flow string
@@ -91,7 +91,7 @@ func (a *application) startPasswordReset(w http.ResponseWriter, r *http.Request)
 		return err
 	})
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	writeJSON(w, 200, map[string]string{"flow": flow})
@@ -101,17 +101,17 @@ func (a *application) login(w http.ResponseWriter, r *http.Request) {
 		Email    string `json:"email"`
 		Password string `json:"password"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	if err := passwordLength(in.Password); err != nil {
-		respondError(w, err)
+	if err := a.passwordLength(in.Password); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	email, err := a.emailInput(r, in.Email, "login:", 10)
+	email, err := a.emailInput(r, in.Email, "login:", a.config.Account.LoginLimit)
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	var token string
@@ -130,8 +130,8 @@ func (a *application) login(w http.ResponseWriter, r *http.Request) {
 }
 func (a *application) logout(w http.ResponseWriter, r *http.Request) {
 	var in struct{}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error {
@@ -141,8 +141,8 @@ func (a *application) logout(w http.ResponseWriter, r *http.Request) {
 }
 func (a *application) logoutAll(w http.ResponseWriter, r *http.Request) {
 	var in struct{}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error { return models.Tokens.DeleteSessions(r.Context(), u.ID) })

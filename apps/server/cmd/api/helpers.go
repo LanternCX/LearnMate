@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/LanternCX/zhiya/apps/server/internal/data"
 )
@@ -22,7 +23,7 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
-func respondError(w http.ResponseWriter, err error) {
+func (a *application) respondError(w http.ResponseWriter, err error) {
 	var e failure
 	var validation data.ValidationError
 	switch {
@@ -42,12 +43,12 @@ func respondError(w http.ResponseWriter, err error) {
 		e = failure{500, "服务暂时不可用，请稍后重试。"}
 	}
 	if e.status == 429 {
-		w.Header().Set("Retry-After", "60")
+		w.Header().Set("Retry-After", strconv.Itoa(a.config.Account.RateWindowSeconds))
 	}
 	writeJSON(w, e.status, map[string]string{"error": e.message})
 }
-func readJSON(w http.ResponseWriter, r *http.Request, value any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 3*1024*1024)
+func (a *application) readJSON(w http.ResponseWriter, r *http.Request, value any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, int64(a.config.Server.MaxBodyBytes))
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
@@ -59,23 +60,23 @@ func readJSON(w http.ResponseWriter, r *http.Request, value any) error {
 	}
 	return nil
 }
-func passwordLength(passwords ...string) error {
+func (a *application) passwordLength(passwords ...string) error {
 	for _, password := range passwords {
-		if len(password) > 256 {
+		if len(password) > data.PasswordMaxBytes {
 			return bad("密码过长。")
 		}
 	}
 	return nil
 }
-func respondOK(w http.ResponseWriter, err error) {
+func (a *application) respondOK(w http.ResponseWriter, err error) {
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 func (a *application) cookie(w http.ResponseWriter, token string) {
-	c := &http.Cookie{Name: "zhiya_session", Value: token, Path: "/", HttpOnly: true, Secure: a.secure, SameSite: http.SameSiteStrictMode, MaxAge: 30 * 24 * 60 * 60}
+	c := &http.Cookie{Name: "zhiya_session", Value: token, Path: "/", HttpOnly: true, Secure: !a.config.Development, SameSite: http.SameSiteStrictMode, MaxAge: a.config.Account.SessionTTLSeconds}
 	if token == "" {
 		c.MaxAge = -1
 	}
@@ -85,5 +86,5 @@ func (a *application) sessionResult(w http.ResponseWriter, token string, err err
 	if err == nil {
 		a.cookie(w, token)
 	}
-	respondOK(w, err)
+	a.respondOK(w, err)
 }

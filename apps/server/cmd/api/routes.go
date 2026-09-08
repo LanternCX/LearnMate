@@ -3,10 +3,15 @@ package main
 import (
 	"io"
 	"net/http"
+
+	"github.com/LanternCX/zhiya/apps/server/internal/data"
 )
 
 func (a *application) routes() http.Handler {
 	api := http.NewServeMux()
+	api.HandleFunc("GET /api/account-rules", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, data.AccountRules())
+	})
 	api.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		_, _ = io.WriteString(w, "ok\n")
@@ -32,7 +37,7 @@ func (a *application) routes() http.Handler {
 	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'; base-uri 'none'")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		http.FileServer(http.Dir(a.web)).ServeHTTP(w, r)
+		http.FileServer(http.Dir(a.config.Server.WebDir)).ServeHTTP(w, r)
 	}))
 	return mux
 }

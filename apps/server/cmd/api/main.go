@@ -5,12 +5,12 @@ import (
 	"flag"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/LanternCX/zhiya/apps/server/internal/data"
 	"github.com/LanternCX/zhiya/apps/server/internal/mailer"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -19,72 +19,58 @@ import (
 type application struct {
 	models data.Models
 	send   func(to, purpose, code string) error
-	secure bool
-	origin string
-	web    string
-}
-
-func env(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
+	config config.Config
 }
 
 func main() {
-	dev := flag.Bool("dev", false, "use loopback PostgreSQL and Mailpit for local development")
-	web := flag.String("web", "../client/dist", "built web client directory")
+	path := flag.String("config", os.Getenv("ZHIYA_SERVER_CONFIG"), "configuration file (required unless ZHIYA_SERVER_CONFIG is set)")
+	check := flag.Bool("check-config", false, "validate configuration and exit")
 	flag.Parse()
+	if *path == "" {
+		log.Fatal("-config or ZHIYA_SERVER_CONFIG is required")
+	}
+	cfg, err := config.Load(*path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if *check {
+		log.Print("configuration is valid")
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	databaseURL := os.Getenv("DATABASE_URL")
-	if *dev {
-		databaseURL = env("DATABASE_URL", "postgres://zhiya:zhiya-local@127.0.0.1:54329/zhiya?sslmode=disable")
-	}
-	if databaseURL == "" {
-		log.Fatal("DATABASE_URL is required (or use -dev for local development)")
-	}
-	db, err := pgxpool.New(ctx, databaseURL)
+	startup, cancel := context.WithTimeout(ctx, config.Seconds(cfg.Server.StartupTimeoutSeconds))
+	defer cancel()
+	db, err := pgxpool.New(startup, cfg.Database.URL)
 	if err != nil {
 		log.Fatal("invalid database configuration")
 	}
 	defer db.Close()
-	origin := env("APP_ORIGIN", "http://127.0.0.1:1420")
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Host == "" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.User != nil || (!*dev && parsed.Scheme != "https") {
-		log.Fatal("APP_ORIGIN must be an HTTPS origin outside development")
-	}
-	address, from := os.Getenv("SMTP_ADDR"), os.Getenv("SMTP_FROM")
-	if *dev {
-		address = env("SMTP_ADDR", "127.0.0.1:1025")
-		from = env("SMTP_FROM", "Zhiya <noreply@zhiya.local>")
-	}
-	send, err := mailer.New(address, from, os.Getenv("SMTP_USER"), os.Getenv("SMTP_PASSWORD"), *dev)
+	send, err := mailer.New(cfg.SMTP, cfg.Development, data.VerificationTTL)
 	if err != nil {
 		log.Fatal(err)
 	}
-	startup, cancel := context.WithTimeout(ctx, 15*time.Second)
-	app := &application{models: data.NewModels(db), send: send, secure: !*dev, origin: origin, web: *web}
+	app := &application{models: data.NewModels(db, cfg.Account), send: send, config: cfg}
 	err = app.models.Initialize(startup)
 	cancel()
 	if err != nil {
 		log.Fatal("database initialization failed: ", err)
 	}
 	server := &http.Server{
-		Addr:              env("LISTEN_ADDR", "127.0.0.1:8080"),
+		Addr:              cfg.Server.Listen,
 		Handler:           app.routes(),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		ReadHeaderTimeout: config.Seconds(cfg.Server.ReadHeaderTimeoutSeconds),
+		ReadTimeout:       config.Seconds(cfg.Server.ReadTimeoutSeconds),
+		WriteTimeout:      config.Seconds(cfg.Server.WriteTimeoutSeconds),
+		IdleTimeout:       config.Seconds(cfg.Server.IdleTimeoutSeconds),
 	}
 	go func() {
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(config.Seconds(cfg.Server.CleanupIntervalSeconds))
 		defer ticker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
-				shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				shutdown, cancel := context.WithTimeout(context.Background(), config.Seconds(cfg.Server.ShutdownTimeoutSeconds))
 				defer cancel()
 				_ = server.Shutdown(shutdown)
 				return

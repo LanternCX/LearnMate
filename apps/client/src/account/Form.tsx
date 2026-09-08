@@ -1,3 +1,4 @@
+import { usePolicy } from "./Policy";
 import { useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 
@@ -38,6 +39,7 @@ export function Field({
 }
 
 export function Password({ current = false }: { current?: boolean }) {
+  const rules = usePolicy();
   const [visible, setVisible] = useState(false);
   return (
     <div className="password-field">
@@ -46,7 +48,7 @@ export function Password({ current = false }: { current?: boolean }) {
         name={current ? "currentPassword" : "password"}
         type={visible ? "text" : "password"}
         autoComplete={current ? "current-password" : "new-password"}
-        maxLength={256}
+        maxLength={rules.password_max_bytes}
       />
       <button
         className="text-button password-toggle"

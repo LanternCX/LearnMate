@@ -8,11 +8,19 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/jackc/pgx/v5"
 )
 
-type TokenModel struct{ db database }
+const VerificationTTL = 10 * time.Minute
+const verificationCodeDigits = 8
+
+type TokenModel struct {
+	db     database
+	policy config.Account
+}
 type Challenge struct {
 	ID, Purpose, Email, NewEmail, UserID, Hash, NewHash string
 	Attempts                                            int
@@ -23,20 +31,20 @@ type failedVerificationAttempt struct{}
 func (failedVerificationAttempt) Error() string { return ErrInvalidCode.Error() }
 func (m TokenModel) NewChallenge(ctx context.Context, purpose, email, newEmail, userID string) (ChallengeCodes, error) {
 	id := randomToken()
-	n, err := rand.Int(rand.Reader, big.NewInt(100000000))
+	n, err := rand.Int(rand.Reader, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(verificationCodeDigits)), nil))
 	if err != nil {
 		return ChallengeCodes{}, err
 	}
-	code := fmt.Sprintf("%08d", n)
+	code := fmt.Sprintf("%0*d", verificationCodeDigits, n)
 	newCode := ""
 	if newEmail != "" {
-		n, err = rand.Int(rand.Reader, big.NewInt(100000000))
+		n, err = rand.Int(rand.Reader, new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(verificationCodeDigits)), nil))
 		if err != nil {
 			return ChallengeCodes{}, err
 		}
-		newCode = fmt.Sprintf("%08d", n)
+		newCode = fmt.Sprintf("%0*d", verificationCodeDigits, n)
 	}
-	_, err = m.db.Exec(ctx, "INSERT INTO challenges(id,purpose,email,new_email,user_id,code_hash,new_code_hash) VALUES($1,$2,$3,$4,NULLIF($5,''),$6,$7)", id, purpose, email, newEmail, userID, digest(id+code), digest(id+newCode))
+	_, err = m.db.Exec(ctx, "INSERT INTO challenges(id,purpose,email,new_email,user_id,code_hash,new_code_hash,expires_at) VALUES($1,$2,$3,$4,NULLIF($5,''),$6,$7,clock_timestamp()+$8*interval '1 second')", id, purpose, email, newEmail, userID, digest(id+code), digest(id+newCode), int(VerificationTTL.Seconds()))
 	if err != nil {
 		return ChallengeCodes{}, err
 	}
@@ -53,7 +61,7 @@ func (m TokenModel) VerifyChallenge(ctx context.Context, flow, code, newCode, pu
 	if err != nil {
 		return c, err
 	}
-	if !valid || c.Purpose != purpose || c.UserID != owner || c.Attempts >= 5 {
+	if !valid || c.Purpose != purpose || c.UserID != owner || c.Attempts >= m.policy.VerificationAttempts {
 		return c, ErrInvalidCode
 	}
 	if digest(c.ID+code) != c.Hash || (purpose == "email" && digest(c.ID+newCode) != c.NewHash) {
@@ -77,7 +85,7 @@ func digest(s string) string { b := sha256.Sum256([]byte(s)); return hex.EncodeT
 
 func (m TokenModel) NewSession(ctx context.Context, id string) (string, error) {
 	token := randomToken()
-	_, err := m.db.Exec(ctx, "INSERT INTO sessions(token_hash,user_id) VALUES($1,$2)", digest(token), id)
+	_, err := m.db.Exec(ctx, "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,clock_timestamp()+$3*interval '1 second')", digest(token), id, m.policy.SessionTTLSeconds)
 	return token, err
 }
 func (m TokenModel) DeleteSession(ctx context.Context, token string) error {
@@ -109,9 +117,9 @@ func (m TokenModel) CleanupExpired(ctx context.Context) error {
 }
 func (m TokenModel) Limit(ctx context.Context, key string, max int) error {
 	var count int
-	err := m.db.QueryRow(ctx, `INSERT INTO auth_limits(key,count,expires_at) VALUES($1,1,now()+interval '1 minute')
+	err := m.db.QueryRow(ctx, `INSERT INTO auth_limits(key,count,expires_at) VALUES($1,1,now()+$2*interval '1 second')
  ON CONFLICT(key) DO UPDATE SET count=CASE WHEN auth_limits.expires_at<=now() THEN 1 ELSE auth_limits.count+1 END,
- expires_at=CASE WHEN auth_limits.expires_at<=now() THEN now()+interval '1 minute' ELSE auth_limits.expires_at END RETURNING count`, digest(key)).Scan(&count)
+ expires_at=CASE WHEN auth_limits.expires_at<=now() THEN now()+$2*interval '1 second' ELSE auth_limits.expires_at END RETURNING count`, digest(key), m.policy.RateWindowSeconds).Scan(&count)
 	if err != nil {
 		return err
 	}

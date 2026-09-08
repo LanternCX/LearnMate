@@ -1,9 +1,11 @@
+import type { AccountPolicy } from "./Policy";
 import { useEffect, useRef, useState } from "react";
 import { api, APIError, setActiveUser } from "../api";
 import type { User } from "../api";
 import type { Flow, View } from "./types";
 
 export function useAccount() {
+  const [policy, setPolicy] = useState<AccountPolicy | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [view, setView] = useState<View>("login");
   const [loading, setLoading] = useState(true);
@@ -37,7 +39,12 @@ export function useAccount() {
     setBusy(false);
     setOffline(false);
     setError("");
+    let rulesLoaded = false;
     try {
+      const rules = await api<AccountPolicy>("/account-rules");
+      if (generation !== epoch.current) return;
+      setPolicy(rules);
+      rulesLoaded = true;
       const me = await api<User>("/me");
       if (generation !== epoch.current) return;
       setActiveUser(me.id);
@@ -46,7 +53,7 @@ export function useAccount() {
       setView("profile");
     } catch (err) {
       if (generation !== epoch.current) return;
-      if (err instanceof APIError && err.status === 401) {
+      if (rulesLoaded && err instanceof APIError && err.status === 401) {
         setUser(null);
         setView("login");
       } else {
@@ -167,7 +174,9 @@ export function useAccount() {
         { email: target },
       );
       setFlow({ id: result.flow, email: target });
-      setNotice("若该邮箱符合条件，验证码将发送至邮箱，10 分钟内有效。");
+      setNotice(
+        `若该邮箱符合条件，验证码将发送至邮箱，${policy!.verification_ttl_seconds / 60} 分钟内有效。`,
+      );
     });
   }
   async function login(data: FormData) {
@@ -182,6 +191,7 @@ export function useAccount() {
   }
 
   return {
+    policy,
     user,
     view,
     loading,

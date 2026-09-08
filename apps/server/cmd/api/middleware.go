@@ -5,8 +5,8 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"time"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/LanternCX/zhiya/apps/server/internal/data"
 )
 
@@ -15,32 +15,32 @@ func (a *application) protect(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+			ctx, cancel := context.WithTimeout(r.Context(), config.Seconds(a.config.Server.RequestTimeoutSeconds))
 			defer cancel()
 			r = r.WithContext(ctx)
 			if r.Method != "GET" {
 				origin := r.Header.Get("Origin")
 				scheme := "http"
-				if a.secure {
+				if !a.config.Development {
 					scheme = "https"
 				}
-				allowed := a.origin
+				allowed := a.config.Server.Origin
 				if allowed == "" {
 					allowed = scheme + "://" + r.Host
 				}
 				if r.Header.Get("X-Zhiya-Request") != "1" || (origin != "" && origin != allowed) || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-					respondError(w, failure{403, "请求来源无效。"})
+					a.respondError(w, failure{403, "请求来源无效。"})
 					return
 				}
 				if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-					respondError(w, failure{415, "请使用 JSON 提交。"})
+					a.respondError(w, failure{415, "请使用 JSON 提交。"})
 					return
 				}
 			}
 			if strings.HasPrefix(r.URL.Path, "/api/auth/") || r.Method != "GET" {
 				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
-				if err := a.models.Tokens.Limit(r.Context(), "ip:"+ip, 60); err != nil {
-					respondError(w, err)
+				if err := a.models.Tokens.Limit(r.Context(), "ip:"+ip, a.config.Account.IPLimit); err != nil {
+					a.respondError(w, err)
 					return
 				}
 			}

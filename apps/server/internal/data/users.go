@@ -7,6 +7,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	"image/png"
@@ -18,6 +19,16 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
+// Product constraints change with the application, not with the deployment.
+const (
+	PasswordMinCharacters = 12
+	PasswordMaxBytes      = 256
+	NicknameMaxCharacters = 40
+	DefaultNickname       = "学习者"
+	AvatarMaxBytes        = 2 * 1024 * 1024
+	AvatarMaxDimension    = 2048
+)
+
 type User struct {
 	ID       string `json:"id"`
 	Email    string `json:"email"`
@@ -25,7 +36,23 @@ type User struct {
 	Avatar   string `json:"avatar"`
 	password string
 }
-type UserModel struct{ db database }
+
+// AccountRules exposes only input constraints that clients need to render forms.
+func AccountRules() map[string]int {
+	return map[string]int{
+		"password_min_characters":  PasswordMinCharacters,
+		"password_max_bytes":       PasswordMaxBytes,
+		"nickname_max_characters":  NicknameMaxCharacters,
+		"avatar_max_bytes":         AvatarMaxBytes,
+		"avatar_max_dimension":     AvatarMaxDimension,
+		"verification_code_digits": verificationCodeDigits,
+		"verification_ttl_seconds": int(VerificationTTL.Seconds()),
+	}
+}
+
+type UserModel struct {
+	db database
+}
 
 func (u User) PasswordMatches(password string) bool { return passwordMatches(password, u.password) }
 func (m UserModel) EmailExists(ctx context.Context, email string) (bool, error) {
@@ -64,7 +91,7 @@ func (m UserModel) GetByChallenge(ctx context.Context, flow string) (string, err
 	return id, err
 }
 func (m UserModel) Insert(ctx context.Context, email, password string) error {
-	tag, err := m.db.Exec(ctx, "INSERT INTO users(id,email,password_hash) VALUES($1,$2,$3) ON CONFLICT(email) DO NOTHING", randomToken(), email, passwordHash(password))
+	tag, err := m.db.Exec(ctx, "INSERT INTO users(id,email,password_hash,nickname) VALUES($1,$2,$3,$4) ON CONFLICT(email) DO NOTHING", randomToken(), email, passwordHash(password), DefaultNickname)
 	if err != nil {
 		return err
 	}
@@ -83,14 +110,14 @@ func (m UserModel) UpdateEmail(ctx context.Context, id, email string) error {
 }
 func (m UserModel) UpdateNickname(ctx context.Context, id, name string) error {
 	name = strings.TrimSpace(name)
-	if !utf8.ValidString(name) || utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > 40 {
-		return ValidationError("昵称需为 1–40 个字符。")
+	if !utf8.ValidString(name) || utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > NicknameMaxCharacters {
+		return ValidationError(fmt.Sprintf("昵称需为 1–%d 个字符。", NicknameMaxCharacters))
 	}
 	_, err := m.db.Exec(ctx, "UPDATE users SET nickname=$1 WHERE id=$2", name, id)
 	return err
 }
 func (m UserModel) UpdateAvatar(ctx context.Context, id, value string) error {
-	avatar, err := validatedAvatar(value)
+	avatar, err := m.validatedAvatar(value)
 	if err != nil {
 		return err
 	}
@@ -153,9 +180,9 @@ func passwordMatches(password, encoded string) bool {
 	actual := argon2.IDKey([]byte(password), salt, 2, 19*1024, 1, 32)
 	return subtle.ConstantTimeCompare(actual, expected) == 1
 }
-func ValidatePassword(s string) error {
-	if utf8.RuneCountInString(s) < 12 || len(s) > 256 {
-		return ValidationError("密码需至少 12 个字符，且不超过 256 字节。")
+func (m UserModel) ValidatePassword(s string) error {
+	if utf8.RuneCountInString(s) < PasswordMinCharacters || len(s) > PasswordMaxBytes {
+		return ValidationError(fmt.Sprintf("密码需至少 %d 个字符，且不超过 %d 字节。", PasswordMinCharacters, PasswordMaxBytes))
 	}
 	return nil
 }
@@ -168,21 +195,21 @@ func NormalizeEmail(s string) (string, error) {
 	return s, nil
 }
 
-func validatedAvatar(value string) ([]byte, error) {
+func (m UserModel) validatedAvatar(value string) ([]byte, error) {
 	if value == "" {
 		return nil, nil
 	}
-	fail := ValidationError("头像仅支持 2 MB 以内、边长不超过 2048 像素的 PNG 或 JPEG 图片。")
+	fail := ValidationError(fmt.Sprintf("头像仅支持 %g MB 以内、边长不超过 %d 像素的 PNG 或 JPEG 图片。", float64(AvatarMaxBytes)/(1024*1024), AvatarMaxDimension))
 	parts := strings.SplitN(value, ",", 2)
 	if len(parts) != 2 || (parts[0] != "data:image/png;base64" && parts[0] != "data:image/jpeg;base64") {
 		return nil, fail
 	}
 	raw, err := base64.StdEncoding.DecodeString(parts[1])
-	if err != nil || len(raw) > 2*1024*1024 {
+	if err != nil || len(raw) > AvatarMaxBytes {
 		return nil, fail
 	}
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(raw))
-	if err != nil || (format != "png" && format != "jpeg") || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > 2048 || cfg.Height > 2048 {
+	if err != nil || (format != "png" && format != "jpeg") || cfg.Width < 1 || cfg.Height < 1 || cfg.Width > AvatarMaxDimension || cfg.Height > AvatarMaxDimension {
 		return nil, fail
 	}
 	img, _, err := image.Decode(bytes.NewReader(raw))
@@ -193,7 +220,7 @@ func validatedAvatar(value string) ([]byte, error) {
 	if err = png.Encode(&out, img); err != nil {
 		return nil, fail
 	}
-	if out.Len() > 2*1024*1024 {
+	if out.Len() > AvatarMaxBytes {
 		return nil, fail
 	}
 	return out.Bytes(), nil

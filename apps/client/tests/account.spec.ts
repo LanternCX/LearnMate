@@ -1,5 +1,12 @@
 import { test, expect } from "@playwright/test";
 import type { APIRequestContext } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { parseEnv } from "node:util";
+import { resolve } from "node:path";
+import { root } from "../../../scripts/config.mjs";
+
+const services = parseEnv(readFileSync(resolve(root, process.env.ZHIYA_SERVICES_ENV ?? "dev-services.env"), "utf8"));
+const mailpit = "http://" + (process.env.MAILPIT_HTTP_BIND ?? services.MAILPIT_HTTP_BIND);
 
 async function emailCode(
   request: APIRequestContext,
@@ -10,14 +17,14 @@ async function emailCode(
   await expect
     .poll(async () => {
       const inbox = await (
-        await request.get("http://127.0.0.1:8025/api/v1/messages")
+        await request.get(mailpit + "/api/v1/messages")
       ).json();
       for (const message of inbox.messages) {
         if (!message.To.some((to: { Address: string }) => to.Address === email))
           continue;
         const detail = await (
           await request.get(
-            `http://127.0.0.1:8025/api/v1/message/${message.ID}`,
+            `${mailpit}/api/v1/message/${message.ID}`,
           )
         ).json();
         if (!detail.Text.includes(purpose)) continue;

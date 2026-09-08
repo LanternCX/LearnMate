@@ -12,16 +12,16 @@ func (a *application) completeRegistration(w http.ResponseWriter, r *http.Reques
 		Code     string `json:"code"`
 		Password string `json:"password"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	if err := passwordLength(in.Password); err != nil {
-		respondError(w, err)
+	if err := a.passwordLength(in.Password); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.models.Transaction(r.Context(), data.IdentityTransaction, func(models data.Models) error {
-		if err := data.ValidatePassword(in.Password); err != nil {
+		if err := models.Users.ValidatePassword(in.Password); err != nil {
 			return err
 		}
 		c, err := models.Tokens.VerifyChallenge(r.Context(), in.Flow, in.Code, "", "register", "")
@@ -33,7 +33,7 @@ func (a *application) completeRegistration(w http.ResponseWriter, r *http.Reques
 		}
 		return models.Tokens.DeleteRegistrationChallenges(r.Context(), c.Email)
 	})
-	respondOK(w, err)
+	a.respondOK(w, err)
 }
 func (a *application) completePasswordReset(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -41,16 +41,16 @@ func (a *application) completePasswordReset(w http.ResponseWriter, r *http.Reque
 		Code     string `json:"code"`
 		Password string `json:"password"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	if err := passwordLength(in.Password); err != nil {
-		respondError(w, err)
+	if err := a.passwordLength(in.Password); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.models.Transaction(r.Context(), data.IdentityTransaction, func(models data.Models) error {
-		if err := data.ValidatePassword(in.Password); err != nil {
+		if err := models.Users.ValidatePassword(in.Password); err != nil {
 			return err
 		}
 		id, err := models.Users.GetByChallenge(r.Context(), in.Flow)
@@ -72,7 +72,7 @@ func (a *application) getProfile(w http.ResponseWriter, r *http.Request) {
 	var current data.User
 	err := a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error { current = u; return nil })
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	writeJSON(w, 200, current)
@@ -81,43 +81,43 @@ func (a *application) updateNickname(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Nickname string `json:"nickname"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error {
 		return models.Users.UpdateNickname(r.Context(), u.ID, in.Nickname)
 	})
-	respondOK(w, err)
+	a.respondOK(w, err)
 }
 func (a *application) updateAvatar(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Avatar string `json:"avatar"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error {
 		return models.Users.UpdateAvatar(r.Context(), u.ID, in.Avatar)
 	})
-	respondOK(w, err)
+	a.respondOK(w, err)
 }
 func (a *application) changePassword(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Password        string `json:"password"`
 		CurrentPassword string `json:"currentPassword"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	if err := passwordLength(in.Password, in.CurrentPassword); err != nil {
-		respondError(w, err)
+	if err := a.passwordLength(in.Password, in.CurrentPassword); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.IdentityTransaction, func(models data.Models, u data.User) error {
-		if err := data.ValidatePassword(in.Password); err != nil {
+		if err := models.Users.ValidatePassword(in.Password); err != nil {
 			return err
 		}
 		if !u.PasswordMatches(in.CurrentPassword) {
@@ -134,18 +134,18 @@ func (a *application) startEmailChange(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Email string `json:"email"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	email, err := a.emailInput(r, in.Email, "mail:", 5)
+	email, err := a.emailInput(r, in.Email, "mail:", a.config.Account.MailLimit)
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	if token := sessionToken(r); token != "" {
-		if err = a.models.Tokens.Limit(r.Context(), "email-change:"+token, 5); err != nil {
-			respondError(w, err)
+		if err = a.models.Tokens.Limit(r.Context(), "email-change:"+token, a.config.Account.EmailChangeLimit); err != nil {
+			a.respondError(w, err)
 			return
 		}
 	}
@@ -165,7 +165,7 @@ func (a *application) startEmailChange(w http.ResponseWriter, r *http.Request) {
 		return err
 	})
 	if err != nil {
-		respondError(w, err)
+		a.respondError(w, err)
 		return
 	}
 	writeJSON(w, 200, map[string]string{"flow": flow})
@@ -176,8 +176,8 @@ func (a *application) completeEmailChange(w http.ResponseWriter, r *http.Request
 		Code    string `json:"code"`
 		NewCode string `json:"newCode"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.IdentityTransaction, func(models data.Models, u data.User) error {
@@ -193,19 +193,19 @@ func (a *application) completeEmailChange(w http.ResponseWriter, r *http.Request
 		}
 		return models.Tokens.DeleteEmailChallenges(r.Context(), u.ID, u.Email, c.NewEmail)
 	})
-	respondOK(w, err)
+	a.respondOK(w, err)
 }
 func (a *application) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Confirm         bool   `json:"confirm"`
 		CurrentPassword string `json:"currentPassword"`
 	}
-	if err := readJSON(w, r, &in); err != nil {
-		respondError(w, err)
+	if err := a.readJSON(w, r, &in); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	if err := passwordLength(in.CurrentPassword); err != nil {
-		respondError(w, err)
+	if err := a.passwordLength(in.CurrentPassword); err != nil {
+		a.respondError(w, err)
 		return
 	}
 	err := a.withUser(r, data.IdentityTransaction, func(models data.Models, u data.User) error {

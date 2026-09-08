@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"errors"
 
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,8 +34,8 @@ type Models struct {
 	pool   *pgxpool.Pool
 }
 
-func NewModels(pool *pgxpool.Pool) Models {
-	return Models{Users: UserModel{db: pool}, Tokens: TokenModel{db: pool}, pool: pool}
+func NewModels(pool *pgxpool.Pool, policy config.Account) Models {
+	return Models{Users: UserModel{db: pool}, Tokens: TokenModel{db: pool, policy: policy}, pool: pool}
 }
 
 type TransactionMode bool
@@ -57,7 +58,7 @@ func (m Models) Transaction(ctx context.Context, mode TransactionMode, action fu
 			return err
 		}
 	}
-	err = action(Models{Users: UserModel{db: tx}, Tokens: TokenModel{db: tx}})
+	err = action(Models{Users: UserModel{db: tx}, Tokens: TokenModel{db: tx, policy: m.Tokens.policy}})
 	var failedAttempt failedVerificationAttempt
 	if errors.As(err, &failedAttempt) {
 		// A rejected code must still consume an attempt. Verify before making other changes.

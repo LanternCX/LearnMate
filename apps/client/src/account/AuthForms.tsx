@@ -1,3 +1,4 @@
+import { usePolicy } from "./Policy";
 import { api } from "../api";
 import { Field, Form, Password } from "./Form";
 import type { AccountController } from "./useAccount";
@@ -32,6 +33,7 @@ export default function AuthForms({
   setNotice,
   login,
 }: Props) {
+  const rules = usePolicy();
   return (
     <>
       {view === "login" && (
@@ -51,7 +53,7 @@ export default function AuthForms({
               name="password"
               type="password"
               autoComplete="current-password"
-              maxLength={256}
+              maxLength={rules.password_max_bytes}
             />
             <button
               type="button"
@@ -115,11 +117,11 @@ export default function AuthForms({
                 label="验证码"
                 name="code"
                 autoComplete="one-time-code"
-                maxLength={8}
+                maxLength={rules.verification_code_digits}
               />
               <Password />
               <p className="hint">
-                密码至少 12 个字符。
+                密码至少 {rules.password_min_characters} 个字符。
                 {view === "reset" && "重设后所有设备都需要重新登录。"}
               </p>
               <button className="primary full">

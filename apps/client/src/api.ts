@@ -47,7 +47,7 @@ export async function api<T = { ok: boolean }>(
       const response = await fetch(`/api${path}`, {
         method,
         credentials: "same-origin",
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(__ZHIYA_CLIENT_CONFIG__.requestTimeoutMilliseconds),
         headers: {
           "Content-Type": "application/json",
           "X-Zhiya-Request": "1",
@@ -61,7 +61,7 @@ export async function api<T = { ok: boolean }>(
   } catch (err) {
     if (typeof err === "string" && /secure storage/i.test(err))
       throw new APIError(0, "无法访问系统安全存储，请解锁后重试。");
-    if (typeof err === "string" && /ZHIYA_API_URL/.test(err))
+    if (typeof err === "string" && /application configuration/i.test(err))
       throw new APIError(0, "应用尚未配置服务地址。");
     throw new APIError(0, "暂时无法连接，请检查网络后重试。");
   }

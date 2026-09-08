@@ -15,6 +15,7 @@ fn allowed(method: &str, path: &str) -> bool {
     matches!(
         (method, path),
         ("GET", "/me")
+            | ("GET", "/account-rules")
             | ("PATCH", "/me")
             | ("DELETE", "/me")
             | ("PUT", "/me/password")
@@ -37,11 +38,7 @@ fn request(
     body: Option<String>,
     expected_user: String,
 ) -> Result<Response, String> {
-    if !allowed(&method, &path)
-        || body
-            .as_ref()
-            .is_some_and(|value| value.len() > 3 * 1024 * 1024)
-    {
+    if !allowed(&method, &path) {
         return Err("Invalid account request".into());
     }
     if cfg!(target_os = "android") {
@@ -59,7 +56,7 @@ fn request(
         Err(_) => return Err("Unable to read secure storage".into()),
     };
     let client = Client::builder()
-        .timeout(Duration::from_secs(25))
+        .timeout(Duration::from_secs(configured_request_timeout_seconds()))
         .redirect(reqwest::redirect::Policy::none())
         .build()
         .map_err(|_| "Network unavailable")?;
@@ -91,16 +88,14 @@ fn request(
 }
 
 fn api_origin() -> Result<&'static str, String> {
-    let base = option_env!("ZHIYA_API_URL").unwrap_or(if cfg!(debug_assertions) {
-        "http://127.0.0.1:8080"
-    } else {
-        ""
-    });
-    let url =
-        reqwest::Url::parse(base).map_err(|_| "Set ZHIYA_API_URL when building the application")?;
+    let base = env!("ZHIYA_BUILD_API_ORIGIN");
+    let url = reqwest::Url::parse(base).map_err(|_| "Invalid application configuration")?;
     let local = cfg!(debug_assertions)
         && url.scheme() == "http"
-        && matches!(url.host_str(), Some("127.0.0.1") | Some("localhost"));
+        && matches!(
+            url.host_str(),
+            Some("127.0.0.1") | Some("localhost") | Some("[::1]")
+        );
     if (!local && url.scheme() != "https")
         || url.path() != "/"
         || url.query().is_some()
@@ -108,9 +103,15 @@ fn api_origin() -> Result<&'static str, String> {
         || !url.username().is_empty()
         || url.password().is_some()
     {
-        return Err("ZHIYA_API_URL must be an HTTPS origin".into());
+        return Err("Invalid application configuration: HTTPS origin required".into());
     }
     Ok(base)
+}
+
+fn configured_request_timeout_seconds() -> u64 {
+    env!("ZHIYA_BUILD_REQUEST_TIMEOUT_SECONDS")
+        .parse()
+        .expect("request timeout is validated by the build launcher")
 }
 
 fn store_session(

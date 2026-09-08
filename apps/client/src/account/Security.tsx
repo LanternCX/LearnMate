@@ -1,3 +1,4 @@
+import { usePolicy } from "./Policy";
 import { api } from "../api";
 import type { User } from "../api";
 import { Field, Form, Password } from "./Form";
@@ -32,6 +33,7 @@ export default function Security({
   refresh,
   setView,
 }: Props) {
+  const rules = usePolicy();
   return (
     <>
       {view === "security" && (
@@ -104,7 +106,7 @@ export default function Security({
           >
             <Password current />
             <Password />
-            <p className="hint">新密码至少 12 个字符。</p>
+            <p className="hint">新密码至少 {rules.password_min_characters} 个字符。</p>
             <button className="primary">保存新密码</button>
           </Form>
         </>
@@ -165,13 +167,13 @@ export default function Security({
                 label="原邮箱验证码"
                 name="code"
                 autoComplete="one-time-code"
-                maxLength={8}
+                maxLength={rules.verification_code_digits}
               />
               <Field
                 label="新邮箱验证码"
                 name="newCode"
                 autoComplete="off"
-                maxLength={8}
+                maxLength={rules.verification_code_digits}
               />
               <button className="primary">确认更换邮箱</button>
               <button

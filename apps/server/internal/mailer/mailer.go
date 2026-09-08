@@ -3,6 +3,7 @@ package mailer
 import (
 	"crypto/tls"
 	"fmt"
+	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"net"
 	"net/mail"
 	"net/smtp"
@@ -10,20 +11,21 @@ import (
 	"time"
 )
 
-func New(address, from, username, password string, local bool) (func(string, string, string) error, error) {
+func New(settings config.SMTP, local bool, validity time.Duration) (func(string, string, string) error, error) {
+	address, from, username, password := settings.Address, settings.From, settings.Username, settings.Password
 	host, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return nil, fmt.Errorf("SMTP_ADDR: %w", err)
+		return nil, fmt.Errorf("invalid smtp.address")
 	}
 	sender, err := mail.ParseAddress(from)
 	if err != nil || strings.ContainsAny(from, "\r\n") {
-		return nil, fmt.Errorf("invalid SMTP_FROM")
+		return nil, fmt.Errorf("invalid smtp.from")
 	}
 	if local && host != "127.0.0.1" && host != "localhost" && host != "::1" {
 		return nil, fmt.Errorf("unencrypted SMTP is only allowed on loopback")
 	}
 	return func(to, purpose, code string) error {
-		dialer := &net.Dialer{Timeout: 10 * time.Second}
+		dialer := &net.Dialer{Timeout: config.Seconds(settings.TimeoutSeconds)}
 		tlsConfig := &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
 		var conn net.Conn
 		var err error
@@ -36,7 +38,7 @@ func New(address, from, username, password string, local bool) (func(string, str
 			return err
 		}
 		defer conn.Close()
-		if err = conn.SetDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		if err = conn.SetDeadline(time.Now().Add(config.Seconds(settings.TimeoutSeconds))); err != nil {
 			return err
 		}
 		client, err := smtp.NewClient(conn, host)
@@ -69,7 +71,7 @@ func New(address, from, username, password string, local bool) (func(string, str
 			return err
 		}
 		label := map[string]string{"register": "注册账号", "reset": "重设密码", "email": "验证原邮箱", "email-new": "验证新邮箱"}[purpose]
-		message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Zhiya verification code\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n知芽 · %s\r\n\r\n验证码：%s\r\n\r\n10 分钟内有效，请勿向任何人透露。若非本人操作，请忽略这封邮件。\r\n", sender.String(), to, label, code)
+		message := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: Zhiya verification code\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n知芽 · %s\r\n\r\n验证码：%s\r\n\r\n%g 分钟内有效，请勿向任何人透露。若非本人操作，请忽略这封邮件。\r\n", sender.String(), to, label, code, validity.Minutes())
 		if _, err = writer.Write([]byte(message)); err != nil {
 			return err
 		}
