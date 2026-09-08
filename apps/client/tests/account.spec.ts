@@ -52,7 +52,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   const password = page.getByLabel("密码", { exact: true });
   await password.fill("1234567");
   await page.getByRole("button", { name: "完成注册", exact: true }).click();
-  await expect(page.getByRole("alert")).toHaveText("密码至少需要 8 个字符");
+  await expect(page.getByText("密码至少需要 8 个字符", { exact: true })).toBeVisible();
   await expect(password).toHaveAttribute("type", "password");
   const showPassword = page.getByRole("button", { name: "显示密码", exact: true });
   await expect(showPassword).toHaveText("");
@@ -64,8 +64,18 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page
     .getByLabel("密码", { exact: true })
     .fill("芽芽芽芽芽芽芽芽");
+  await page.getByLabel("确认密码", { exact: true }).fill("芽芽芽芽芽芽芽芽");
   await page.getByRole("button", { name: "完成注册", exact: true }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
+  await page.getByRole("button", { name: "注册账号", exact: true }).click();
+  await page.getByRole("button", { name: "发送验证码", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("该邮箱已注册，请登录或找回密码");
+  await expect(page.getByLabel("邮箱", { exact: true })).toHaveValue(email);
+  await expect(page.getByLabel("验证码", { exact: true })).not.toBeVisible();
+  await page.getByRole("button", { name: "忘记密码", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "找回密码" })).toBeVisible();
+  await expect(page.getByLabel("邮箱", { exact: true })).toHaveValue(email);
+  await page.getByRole("button", { name: "返回登录", exact: true }).click();
   await page.getByLabel("邮箱", { exact: true }).fill(email);
   await page
     .getByLabel("密码", { exact: true })
@@ -110,6 +120,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page
     .getByLabel("密码", { exact: true })
     .fill("A-changed-test-password-123");
+  await page.getByLabel("确认密码", { exact: true }).fill("A-changed-test-password-123");
   await page.getByRole("button", { name: "保存新密码" }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   await expect(
@@ -138,7 +149,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page.getByRole("button", { name: "退出全部设备", exact: true }).click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "确认", exact: true })
+    .getByRole("button", { name: "退出全部设备", exact: true })
     .click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   await page.getByRole("button", { name: "忘记密码" }).click();
@@ -150,6 +161,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page
     .getByLabel("密码", { exact: true })
     .fill("A-recovered-test-password-123");
+  await page.getByLabel("确认密码", { exact: true }).fill("A-recovered-test-password-123");
   await page.getByRole("button", { name: "重设密码", exact: true }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   await page.getByLabel("邮箱", { exact: true }).fill(newEmail);
@@ -165,6 +177,7 @@ test("a learner can register, edit their profile, and permanently delete their a
     .fill("A-recovered-test-password-123");
   await page.getByLabel("我确认永久删除账号及关联个人数据，且无法恢复").check();
   await page.getByRole("button", { name: "永久注销账号" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "永久注销账号", exact: true }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("账号已注销");
 });

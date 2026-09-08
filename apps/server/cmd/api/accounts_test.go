@@ -105,6 +105,23 @@ func (a *testApp) request(c *http.Client, method, path string, body any, status 
 
 const testPassword = "A-long-test-password-123"
 
+func TestDuplicateRegistrationOffersAccountRecovery(t *testing.T) {
+	a := setupAccountTest(t)
+	a.register("registered@example.com")
+	delete(a.mail, "registered@example.com:register")
+	result := a.request(a.client(), "POST", "/auth/register/start", map[string]string{"email": " Registered@Example.com "}, 409)
+	if result["error"] != "该邮箱已注册，请登录或找回密码" {
+		t.Fatalf("unexpected duplicate registration response: %v", result)
+	}
+	if _, ok := result["flow"]; ok {
+		t.Fatal("duplicate registration must not return a verification flow")
+	}
+	if _, sent := a.mail["registered@example.com:register"]; sent {
+		t.Fatal("duplicate registration must not send a registration code")
+	}
+	a.request(a.client(), "POST", "/auth/login", map[string]string{"email": "registered@example.com", "password": testPassword}, 200)
+}
+
 func (a *testApp) register(email string) *http.Client {
 	a.t.Helper()
 	c := a.client()

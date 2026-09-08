@@ -1,7 +1,7 @@
-import { usePolicy } from "./Policy";
 import { api } from "../api";
-import { Field, Form, Password } from "./Form";
+import { CodeField, Field, Form, NewPasswordFields, Password } from "./Form";
 import type { AccountController } from "./useAccount";
+import { useVerification, VerificationActions, VerificationHelp } from "./Verification";
 
 type Props = Pick<
   AccountController,
@@ -33,7 +33,7 @@ export default function AuthForms({
   setNotice,
   login,
 }: Props) {
-  const rules = usePolicy();
+  const verification = useVerification(flow);
   return (
     <>
       {view === "login" && (
@@ -48,13 +48,7 @@ export default function AuthForms({
               value={email}
               onChange={setEmail}
             />
-            <Field
-              label="密码"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              maxLength={rules.password_max_bytes}
-            />
+            <Password current label="密码" name="password" />
             <button
               type="button"
               className="text-button forgot"
@@ -72,7 +66,7 @@ export default function AuthForms({
         <>
           <p className="description">
             {flow
-              ? `请填写 ${flow.email} 收到的验证码`
+              ? `验证码已发送至 ${flow.email}，请查收。`
               : view === "register"
                 ? "验证邮箱后，即可创建账号。"
                 : "通过注册邮箱验证身份，设置新密码。"}
@@ -90,7 +84,7 @@ export default function AuthForms({
                 value={email}
                 onChange={setEmail}
               />
-              <button className="primary full">发送验证码</button>
+              <button className="primary full">{busy ? "正在发送…" : "发送验证码"}</button>
             </Form>
           ) : (
             <Form
@@ -113,27 +107,15 @@ export default function AuthForms({
                 })
               }
             >
-              <Field
-                label="验证码"
-                name="code"
-                autoComplete="one-time-code"
-                maxLength={rules.verification_code_digits}
-              />
-              <Password />
-              <p className="hint">
-                密码至少 {rules.password_min_characters} 个字符
-                {view === "reset" && "，重设后所有设备都需要重新登录"}
-              </p>
-              <button className="primary full">
+              <CodeField key={flow.id} />
+              <VerificationHelp {...verification} />
+              <NewPasswordFields />
+              {view === "reset" && <p className="hint">重设后所有设备都需要重新登录</p>}
+              <button className="primary full" disabled={verification.expired}>
                 {view === "register" ? "完成注册" : "重设密码"}
               </button>
-              <button
-                type="button"
-                className="text-button resend"
-                onClick={() => void sendCode(view, flow.email)}
-              >
-                重新发送验证码
-              </button>
+              <VerificationActions cooldown={verification.cooldown} busy={busy}
+                resend={() => sendCode(view, flow.email)} changeEmail={() => void navigate(view)} />
             </Form>
           )}
           <button
@@ -143,6 +125,15 @@ export default function AuthForms({
           >
             返回登录
           </button>
+          {view === "register" && !flow && (
+            <button
+              className="text-button recovery-link"
+              disabled={busy}
+              onClick={() => navigate("reset")}
+            >
+              忘记密码
+            </button>
+          )}
         </>
       )}
     </>

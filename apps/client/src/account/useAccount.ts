@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, APIError, setActiveUser } from "../api";
 import type { User } from "../api";
 import type { Flow, View } from "./types";
+import type { ConfirmationOptions } from "../components/Confirmation";
 
 export function useAccount() {
   const [policy, setPolicy] = useState<AccountPolicy | null>(null);
@@ -18,19 +19,28 @@ export function useAccount() {
   const [nickname, setNickname] = useState("");
   const [avatarDraft, setAvatarDraft] = useState<string | null>(null);
   const epoch = useRef(0);
+  const running = useRef(false);
   const channel = useRef<BroadcastChannel | null>(null);
-  const [confirmation, setConfirmation] = useState<{
-    text: string;
-    resolve: (value: boolean) => void;
-  } | null>(null);
-  function confirmAction(text: string) {
-    return new Promise<boolean>((resolve) =>
-      setConfirmation({ text, resolve }),
-    );
+  const [confirmation, setConfirmation] = useState<ConfirmationOptions | null>(null);
+  const pendingConfirmation = useRef<((confirmed: boolean) => void) | null>(null);
+  function answerConfirmation(confirmed: boolean) {
+    const resolve = pendingConfirmation.current;
+    pendingConfirmation.current = null;
+    setConfirmation(null);
+    resolve?.(confirmed);
+  }
+  function confirmAction(options: ConfirmationOptions) {
+    if (running.current || pendingConfirmation.current) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      pendingConfirmation.current = resolve;
+      setConfirmation(options);
+    });
   }
 
   async function load() {
     const generation = ++epoch.current;
+    answerConfirmation(false);
+    running.current = false;
     setActiveUser("");
     setUser(null);
     setAvatarDraft(null);
@@ -68,6 +78,8 @@ export function useAccount() {
     void load();
     return () => {
       epoch.current++;
+      pendingConfirmation.current?.(false);
+      pendingConfirmation.current = null;
     };
   }, []);
   useEffect(() => {
@@ -91,6 +103,8 @@ export function useAccount() {
     setActiveUser("");
     channel.current?.postMessage("changed");
     epoch.current++;
+    answerConfirmation(false);
+    running.current = false;
     setBusy(false);
     setUser(null);
     setNickname("");
@@ -101,7 +115,8 @@ export function useAccount() {
     setNotice(text);
   }
   async function run(action: () => Promise<void>) {
-    if (busy) return;
+    if (running.current) return;
+    running.current = true;
     const generation = epoch.current;
     setBusy(true);
     setError("");
@@ -114,8 +129,16 @@ export function useAccount() {
         clearSession("登录已失效，请重新登录");
       else setError(message(err));
     } finally {
-      if (generation === epoch.current) setBusy(false);
+      if (generation === epoch.current) {
+        running.current = false;
+        setBusy(false);
+      }
     }
+  }
+  async function runConfirmed(options: ConfirmationOptions, action: () => Promise<void>) {
+    const generation = epoch.current;
+    if (!(await confirmAction(options)) || generation !== epoch.current) return;
+    await run(action);
   }
   async function refresh() {
     const generation = epoch.current;
@@ -133,7 +156,11 @@ export function useAccount() {
       view === "profile" &&
       user &&
       (nickname !== user.nickname || avatarDraft !== null) &&
-      !(await confirmAction("资料尚未保存，确定离开吗？"))
+      !(await confirmAction({
+        title: "放弃未保存的修改？",
+        text: "资料尚未保存，离开后这些修改将丢失。",
+        confirmLabel: "放弃修改",
+      }))
     )
       return;
     if (generation !== epoch.current) return;
@@ -145,23 +172,13 @@ export function useAccount() {
     if (user) setNickname(user.nickname);
   }
   async function logout(all: boolean) {
-    const generation = epoch.current;
-    if (
-      view === "profile" &&
-      user &&
-      (nickname !== user.nickname || avatarDraft !== null) &&
-      !(await confirmAction("资料尚未保存，确定退出吗？"))
-    )
-      return;
-    if (
-      all &&
-      !(await confirmAction(
-        "退出全部设备后，当前设备也需要重新登录。确定退出吗？",
-      ))
-    )
-      return;
-    if (generation !== epoch.current) return;
-    await run(async () => {
+    const unsaved = view === "profile" && user && (nickname !== user.nickname || avatarDraft !== null);
+    await runConfirmed({
+      title: all ? "退出全部设备？" : "退出登录？",
+      text: (all ? "当前及其他设备都会退出，需要重新登录才能继续使用。" : "当前设备将退出，需要重新登录才能继续使用。")
+        + (unsaved ? "资料尚未保存，退出后这些修改将丢失。" : "已保存的资料会保留。"),
+      confirmLabel: all ? "退出全部设备" : "退出登录",
+    }, async () => {
       await api(all ? "/auth/logout-all" : "/auth/logout", "POST", {});
       clearSession(all ? "已退出全部设备" : "已退出登录");
     });
@@ -173,10 +190,15 @@ export function useAccount() {
         "POST",
         { email: target },
       );
-      setFlow({ id: result.flow, email: target });
-      setNotice(
-        `请查看邮箱，在 ${policy!.verification_ttl_seconds / 60} 分钟内填写验证码`,
-      );
+      setFlow({ id: result.flow, email: target, sentAt: Date.now() });
+      setEmail(target);
+    });
+  }
+  function sendEmailCode(target: string) {
+    return run(async () => {
+      const result = await api<{ flow: string }>("/me/email/start", "POST", { email: target });
+      setFlow({ id: result.flow, email: target, sentAt: Date.now() });
+      setNotice("验证码已分别发送至原邮箱和新邮箱，请使用最新收到的验证码");
     });
   }
   async function login(data: FormData) {
@@ -209,7 +231,9 @@ export function useAccount() {
     navigate,
     logout,
     sendCode,
+    sendEmailCode,
     run,
+    runConfirmed,
     refresh,
     clearSession,
     setView,
@@ -219,10 +243,7 @@ export function useAccount() {
     setAvatarDraft,
     setError,
     setNotice,
-    answerConfirmation(confirmed: boolean) {
-      confirmation?.resolve(confirmed);
-      setConfirmation(null);
-    },
+    answerConfirmation,
   };
 }
 

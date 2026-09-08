@@ -1,8 +1,9 @@
-import { usePolicy } from "./Policy";
 import { api } from "../api";
+import { useId, useState } from "react";
 import type { User } from "../api";
-import { Field, Form, Password } from "./Form";
+import { CodeField, Field, Form, NewPasswordFields, Password } from "./Form";
 import type { AccountController } from "./useAccount";
+import { useVerification, VerificationActions, VerificationHelp } from "./Verification";
 
 type Props = Pick<
   AccountController,
@@ -12,6 +13,8 @@ type Props = Pick<
   | "navigate"
   | "logout"
   | "run"
+  | "runConfirmed"
+  | "sendEmailCode"
   | "clearSession"
   | "setFlow"
   | "setNotice"
@@ -27,13 +30,15 @@ export default function Security({
   navigate,
   logout,
   run,
+  runConfirmed,
+  sendEmailCode,
   clearSession,
   setFlow,
   setNotice,
   refresh,
   setView,
 }: Props) {
-  const rules = usePolicy();
+  const verification = useVerification(flow);
   return (
     <>
       {view === "security" && (
@@ -105,8 +110,7 @@ export default function Security({
             }
           >
             <Password current />
-            <Password />
-            <p className="hint">新密码至少 {rules.password_min_characters} 个字符</p>
+            <NewPasswordFields />
             <button className="primary">保存新密码</button>
           </Form>
         </>
@@ -119,18 +123,7 @@ export default function Security({
           {!flow ? (
             <Form
               busy={busy}
-              submit={(data) =>
-                run(async () => {
-                  const target = String(data.get("email"));
-                  const result = await api<{ flow: string }>(
-                    "/me/email/start",
-                    "POST",
-                    { email: target },
-                  );
-                  setFlow({ id: result.flow, email: target });
-                  setNotice("验证码已分别发送至原邮箱和新邮箱");
-                })
-              }
+              submit={(data) => sendEmailCode(String(data.get("email")))}
             >
               <p className="hint">原邮箱：{user.email}</p>
               <Field
@@ -138,8 +131,9 @@ export default function Security({
                 name="email"
                 type="email"
                 autoComplete="email"
+                validate={text => text.toLowerCase() === user.email.toLowerCase() ? "请输入不同的新邮箱" : ""}
               />
-              <button className="primary">发送两封验证邮件</button>
+              <button className="primary">{busy ? "正在发送…" : "发送两封验证邮件"}</button>
             </Form>
           ) : (
             <Form
@@ -163,29 +157,12 @@ export default function Security({
                 <br />
                 新邮箱：{flow.email}
               </p>
-              <Field
-                label="原邮箱验证码"
-                name="code"
-                autoComplete="one-time-code"
-                maxLength={rules.verification_code_digits}
-              />
-              <Field
-                label="新邮箱验证码"
-                name="newCode"
-                autoComplete="off"
-                maxLength={rules.verification_code_digits}
-              />
-              <button className="primary">确认更换邮箱</button>
-              <button
-                type="button"
-                className="text-button resend"
-                onClick={() => {
-                  setFlow(null);
-                  setNotice("");
-                }}
-              >
-                重新获取验证码
-              </button>
+              <CodeField key={`${flow.id}:old`} label="原邮箱验证码" />
+              <CodeField key={`${flow.id}:new`} label="新邮箱验证码" name="newCode" />
+              <VerificationHelp {...verification} />
+              <button className="primary" disabled={verification.expired}>确认更换邮箱</button>
+              <VerificationActions cooldown={verification.cooldown} busy={busy}
+                resend={() => sendEmailCode(flow.email)} changeEmail={() => void navigate("email")} />
             </Form>
           )}
           <p className="hint">无法访问原邮箱时，暂不支持人工申诉更换</p>
@@ -202,7 +179,12 @@ export default function Security({
           <Form
             busy={busy}
             submit={(data) =>
-              run(async () => {
+              runConfirmed({
+                title: "永久注销账号？",
+                text: "账号及关联个人数据（包括学习记录）将被永久删除，无法恢复。所有设备都会退出登录。",
+                confirmLabel: "永久注销账号",
+                danger: true,
+              }, async () => {
                 await api("/me", "DELETE", {
                   currentPassword: data.get("currentPassword"),
                   confirm: data.get("confirm") === "on",
@@ -212,14 +194,28 @@ export default function Security({
             }
           >
             <Password current />
-            <label className="checkbox">
-              <input type="checkbox" name="confirm" required />
-              我确认永久删除账号及关联个人数据，且无法恢复
-            </label>
+            <DeletionConsent />
             <button className="primary danger">永久注销账号</button>
           </Form>
         </>
       )}
     </>
   );
+}
+
+function DeletionConsent() {
+  const id = useId();
+  const [checked, setChecked] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const invalid = attempted && !checked;
+  return <div className="deletion-consent">
+    <label className="checkbox">
+      <input type="checkbox" name="confirm" required checked={checked}
+        onChange={event => setChecked(event.target.checked)}
+        onInvalid={event => { event.preventDefault(); setAttempted(true); }}
+        aria-invalid={invalid ? true : undefined} aria-describedby={invalid ? id : undefined} />
+      我确认永久删除账号及关联个人数据，且无法恢复
+    </label>
+    <p id={id} className="field-error" aria-live="polite" hidden={!invalid}>请先确认注销后无法恢复</p>
+  </div>;
 }

@@ -28,9 +28,14 @@ export default function App() {
     answerConfirmation,
   } = account;
   const heading = useRef<HTMLHeadingElement>(null);
+  const errorMessage = useRef<HTMLParagraphElement>(null);
+  const hasFlow = flow !== null;
   useEffect(() => {
     if (!loading) heading.current?.focus();
-  }, [view, loading, flow]);
+  }, [view, loading, hasFlow]);
+  useEffect(() => {
+    if (error) errorMessage.current?.focus();
+  }, [error]);
 
   const titles: Record<View, string> = {
     login: "登录知芽",
@@ -45,7 +50,7 @@ export default function App() {
   const feedback = (
     <>
       {error && (
-        <p className="feedback error" role="alert">
+        <p ref={errorMessage} tabIndex={-1} className="feedback error" role="alert">
           {error}
         </p>
       )}
@@ -138,7 +143,7 @@ export default function App() {
               {feedback}
               <div
                 className="view-content"
-                key={`${view}:${user?.id ?? "guest"}:${flow?.id ?? "start"}`}
+                key={`${view}:${user?.id ?? "guest"}:${flow?.email ?? "start"}`}
               >
                 {!user ? (
                   <AuthForms {...account} />
@@ -169,7 +174,7 @@ export default function App() {
           </>
         )}
         {confirmation && (
-          <Confirmation text={confirmation.text} answer={answerConfirmation} />
+          <Confirmation {...confirmation} answer={answerConfirmation} />
         )}
         <footer>知芽 · Zhiya</footer>
       </div>

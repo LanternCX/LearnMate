@@ -52,8 +52,7 @@ func (a *application) startRegistration(w http.ResponseWriter, r *http.Request) 
 			return err
 		}
 		if exists {
-			flow = fakeFlow()
-			return nil
+			return failure{http.StatusConflict, "该邮箱已注册，请登录或找回密码"}
 		}
 		flow, err = a.sendChallenge(r.Context(), models, "register", email, "", "")
 		return err

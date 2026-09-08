@@ -1,5 +1,5 @@
 import { usePolicy } from "./Policy";
-import { useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 
 export function Field({
@@ -10,6 +10,9 @@ export function Field({
   maxLength,
   value,
   onChange,
+  validate,
+  hint,
+  inputMode,
 }: {
   label: string;
   name: string;
@@ -18,44 +21,111 @@ export function Field({
   maxLength?: number;
   value?: string;
   onChange?: (value: string) => void;
+  validate?: (value: string) => string;
+  hint?: string;
+  inputMode?: "email" | "numeric";
 }) {
+  const id = useId();
+  const input = useRef<HTMLInputElement>(null);
+  const [draft, setDraft] = useState("");
+  const [touched, setTouched] = useState(false);
+  const text = value ?? draft;
+  const normalized = type === "email" ? text.trim() : text;
+  const message = !normalized
+    ? `请输入${label}`
+    : type === "email" &&
+        (normalized.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))
+      ? "请输入有效的邮箱地址，例如 name@example.com"
+      : validate?.(normalized) ?? "";
+  useLayoutEffect(() => {
+    input.current?.setCustomValidity(message);
+  }, [message]);
+  const error = touched ? message : "";
   return (
-    <label className="field">
-      {label}
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
       <input
+        id={id}
+        ref={input}
         name={name}
-        type={type}
+        type={type === "email" ? "text" : type}
+        data-email={type === "email" ? true : undefined}
         autoComplete={autoComplete}
         maxLength={maxLength}
-        value={value}
-        onChange={
-          onChange ? (event) => onChange(event.target.value) : undefined
-        }
+        value={text}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          onChange?.(event.target.value);
+        }}
+        onBlur={() => {
+          setTouched(true);
+          if (type === "email") {
+            setDraft(normalized);
+            onChange?.(normalized);
+          }
+        }}
+        onInvalid={(event) => {
+          event.preventDefault();
+          setTouched(true);
+        }}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error || hint ? `${id}-help` : undefined}
+        inputMode={inputMode ?? (type === "email" ? "email" : undefined)}
+        autoCapitalize="none"
         required
         spellCheck={false}
       />
-    </label>
+      <p
+        id={`${id}-help`}
+        className={error ? "field-error" : "field-hint"}
+        aria-live="polite"
+        hidden={!error && !hint}
+      >
+        {error || hint}
+      </p>
+    </div>
   );
 }
 
-export function Password({ current = false }: { current?: boolean }) {
+export function Password({
+  current = false,
+  label,
+  name,
+  value,
+  onChange,
+  validate,
+}: {
+  current?: boolean;
+  label?: string;
+  name?: string;
+  value?: string;
+  onChange?: (value: string) => void;
+  validate?: (value: string) => string;
+}) {
   const rules = usePolicy();
   const [visible, setVisible] = useState(false);
+  const fieldLabel = label ?? (current ? "当前密码" : "密码");
+  const toggleLabel = `${visible ? "隐藏" : "显示"}${fieldLabel}`;
   return (
     <div className="password-field">
       <Field
-        label={current ? "当前密码" : "密码"}
-        name={current ? "currentPassword" : "password"}
+        label={fieldLabel}
+        name={name ?? (current ? "currentPassword" : "password")}
         type={visible ? "text" : "password"}
         autoComplete={current ? "current-password" : "new-password"}
-        maxLength={rules.password_max_bytes}
+        value={value}
+        onChange={onChange}
+        validate={validate ?? (text =>
+          new TextEncoder().encode(text).length > rules.password_max_bytes
+            ? "密码太长，请缩短后重试" : ""
+        )}
       />
       <button
         className="password-toggle"
         type="button"
         aria-pressed={visible}
-        aria-label={visible ? "隐藏密码" : "显示密码"}
-        title={visible ? "隐藏密码" : "显示密码"}
+        aria-label={toggleLabel}
+        title={toggleLabel}
         onClick={() => setVisible(!visible)}
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -73,6 +143,69 @@ export function Password({ current = false }: { current?: boolean }) {
   );
 }
 
+export function NewPasswordFields() {
+  const rules = usePolicy();
+  const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const longEnough = Array.from(password).length >= rules.password_min_characters;
+  const withinLimit = new TextEncoder().encode(password).length <= rules.password_max_bytes;
+  const requirements = [
+    { text: `至少 ${rules.password_min_characters} 个字符`, met: longEnough },
+    { text: "长度未超出上限", met: !!password && withinLimit },
+  ];
+  return (
+    <>
+      <Password
+        value={password}
+        onChange={setPassword}
+        validate={() => !longEnough
+          ? `密码至少需要 ${rules.password_min_characters} 个字符`
+          : !withinLimit ? "密码太长，请缩短后重试" : ""
+        }
+      />
+      <ul className="password-rules" aria-label="密码要求">
+        {requirements.map(({ text, met }) => (
+          <li key={text} data-met={met}>
+            <span aria-hidden="true">{met ? "✓" : "○"}</span>
+            <span className="visually-hidden">{met ? "已满足：" : "未满足："}</span>
+            <span>{text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="password-status" aria-live="polite">
+        {password && longEnough && withinLimit ? "密码符合要求" : "可使用中文、字母、数字或符号"}
+      </p>
+      <Password
+        label="确认密码"
+        name="confirmPassword"
+        value={confirmation}
+        onChange={setConfirmation}
+        validate={text => text !== password ? "两次输入的密码不一致" : ""}
+      />
+      {confirmation && confirmation === password && <p className="match-status">两次输入一致</p>}
+    </>
+  );
+}
+
+export function CodeField({ label = "验证码", name = "code" }: {
+  label?: string;
+  name?: string;
+}) {
+  const rules = usePolicy();
+  return (
+    <Field
+      label={label}
+      name={name}
+      autoComplete="one-time-code"
+      inputMode="numeric"
+      hint={`${rules.verification_code_digits} 位数字，可直接粘贴`}
+      validate={text => new RegExp(`^[0-9]{${rules.verification_code_digits}}$`).test(text)
+        ? "" : `请输入 ${rules.verification_code_digits} 位数字验证码`
+      }
+    />
+  );
+}
+
 export function Form({
   children,
   submit,
@@ -84,9 +217,20 @@ export function Form({
 }) {
   return (
     <form
+      noValidate
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!busy) void submit(new FormData(event.currentTarget));
+        if (busy) return;
+        const form = event.currentTarget;
+        if (!form.checkValidity()) {
+          form.querySelector<HTMLInputElement>("input:invalid")?.focus();
+          return;
+        }
+        const data = new FormData(form);
+        for (const input of form.querySelectorAll<HTMLInputElement>("input[data-email]")) {
+          data.set(input.name, input.value.trim().toLowerCase());
+        }
+        void submit(data);
       }}
     >
       <fieldset disabled={busy}>{children}</fieldset>

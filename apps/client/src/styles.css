@@ -40,7 +40,7 @@ button {
   border-radius: 12px;
 }
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.65;
 }
 button,
@@ -249,6 +249,7 @@ input:not([type="checkbox"]):not([type="file"]) {
   display: block;
   margin: -16px 0 12px auto;
 }
+.recovery-link { margin-left: 20px; }
 .switch-auth {
   grid-column: 2;
   display: flex;
@@ -264,6 +265,42 @@ input:not([type="checkbox"]):not([type="file"]) {
 .password-field {
   position: relative;
 }
+.field-error, .field-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.field-error { color: var(--error); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.field-hint { color: var(--muted); }
+input[aria-invalid="true"] { border-color: var(--error) !important; }
+.password-rules {
+  list-style: none;
+  padding: 12px 16px;
+  margin: -4px 0 0;
+  border-radius: 8px;
+  background: var(--subtle);
+  font-size: 13px;
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+}
+.password-rules li { display: flex; gap: 8px; align-items: baseline; }
+.password-rules [data-met="true"] { color: var(--accent); }
+.password-status, .match-status {
+  font-size: 13px;
+  color: var(--accent);
+  margin: 8px 0 20px;
+}
+.match-status { margin-top: -12px; }
 .password-field input {
   padding-right: 56px !important;
 }
@@ -306,6 +343,8 @@ input:not([type="checkbox"]):not([type="file"]) {
   display: block;
   margin-top: 12px;
 }
+.verification-help { display: grid; gap: 6px; margin: -8px 0 20px; }
+.verification-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
 .feedback {
   padding: 12px 16px;
   border: 1px solid var(--line);
@@ -467,6 +506,8 @@ input:not([type="checkbox"]):not([type="file"]) {
   height: 20px;
   accent-color: var(--accent);
 }
+.deletion-consent { margin-bottom: 24px; }
+.deletion-consent .checkbox { margin-bottom: 8px; }
 .connection {
   grid-column: 1 / -1;
   margin: 60px auto;
@@ -495,12 +536,21 @@ footer {
   background: #142d2a66;
   backdrop-filter: blur(4px);
 }
+.confirmation .inline-actions { justify-content: flex-end; }
+.confirmation p { overflow-wrap: anywhere; }
+.confirmation { max-height: calc(100dvh - 32px); overflow-y: auto; }
 @media (min-width: 721px) {
   .signed-out {
     grid-template-rows: auto minmax(48px, 1fr) auto auto minmax(48px, 1fr) auto;
   }
   .signed-out .brand {
     margin-bottom: 0;
+  }
+  .signed-out:has(.password-rules) {
+    grid-template-rows: auto 24px auto auto 24px auto;
+  }
+  .signed-out:has(.password-rules) .account-surface {
+    padding: 24px 32px;
   }
   .signed-out .welcome {
     grid-row: 3 / 5;

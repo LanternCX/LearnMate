@@ -7,4 +7,4 @@ export type View =
   | "password"
   | "email"
   | "delete";
-export type Flow = { id: string; email: string };
+export type Flow = { id: string; email: string; sentAt: number };
