@@ -85,6 +85,7 @@ test("permanent deletion waits for final confirmation and cancellation is harmle
   await page.goto("/");
   await page.getByRole("button", { name: "账号安全", exact: true }).click();
   await page.getByRole("button", { name: "注销账号", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "注销后无法恢复" })).not.toBeVisible();
   await page.getByLabel("当前密码", { exact: true }).fill("my-password");
   await page.getByRole("button", { name: "永久注销账号", exact: true }).click();
   await expect(page.getByText("请先确认注销后无法恢复", { exact: true })).toBeVisible();
@@ -167,7 +168,8 @@ test("registration explains password rules and requires matching passwords befor
   await expect(password).toBeFocused();
   expect(submissions).toHaveLength(0);
   await password.fill("芽芽芽芽芽芽芽芽");
-  await expect(page.getByText("密码符合要求", { exact: true })).toBeVisible();
+  await expect(page.getByText("密码符合要求", { exact: true })).not.toBeVisible();
+  await expect(page.getByRole("list", { name: "密码要求" }).getByRole("listitem").filter({ hasText: "已满足：" })).toHaveCount(2);
   await expect(page.getByText("两次输入的密码不一致", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "完成注册", exact: true }).click();
   await expect(confirmation).toBeFocused();
@@ -177,7 +179,7 @@ test("registration explains password rules and requires matching passwords befor
   await expect(page.getByText("密码太长，请缩短后重试", { exact: true })).toBeVisible();
   await password.fill("🌱".repeat(64));
   await confirmation.fill("🌱".repeat(64));
-  await expect(page.getByText("两次输入一致", { exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: "两次输入一致" })).toBeVisible();
   await page.getByRole("button", { name: "完成注册", exact: true }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   expect(submissions).toEqual([{ flow: "registration", code: "12345678", password: "🌱".repeat(64) }]);

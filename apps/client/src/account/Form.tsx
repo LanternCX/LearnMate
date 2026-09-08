@@ -94,6 +94,7 @@ export function Password({
   value,
   onChange,
   validate,
+  success,
 }: {
   current?: boolean;
   label?: string;
@@ -101,13 +102,14 @@ export function Password({
   value?: string;
   onChange?: (value: string) => void;
   validate?: (value: string) => string;
+  success?: string;
 }) {
   const rules = usePolicy();
   const [visible, setVisible] = useState(false);
   const fieldLabel = label ?? (current ? "当前密码" : "密码");
   const toggleLabel = `${visible ? "隐藏" : "显示"}${fieldLabel}`;
   return (
-    <div className="password-field">
+    <div className={`password-field${success ? " has-success" : ""}`}>
       <Field
         label={fieldLabel}
         name={name ?? (current ? "currentPassword" : "password")}
@@ -120,6 +122,11 @@ export function Password({
             ? "密码太长，请缩短后重试" : ""
         )}
       />
+      {success && (
+        <svg className="password-success" viewBox="0 0 24 24" role="img" aria-label={success}>
+          <path d="m5 12 4 4L19 6" />
+        </svg>
+      )}
       <button
         className="password-toggle"
         type="button"
@@ -163,26 +170,25 @@ export function NewPasswordFields() {
           : !withinLimit ? "密码太长，请缩短后重试" : ""
         }
       />
-      <ul className="password-rules" aria-label="密码要求">
+      <ul className="password-rules" aria-label="密码要求" aria-live="polite">
         {requirements.map(({ text, met }) => (
           <li key={text} data-met={met}>
-            <span aria-hidden="true">{met ? "✓" : "○"}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              {met ? <path d="m5 12 4 4L19 6" /> : <circle cx="12" cy="12" r="7" />}
+            </svg>
             <span className="visually-hidden">{met ? "已满足：" : "未满足："}</span>
             <span>{text}</span>
           </li>
         ))}
       </ul>
-      <p className="password-status" aria-live="polite">
-        {password && longEnough && withinLimit ? "密码符合要求" : "可使用中文、字母、数字或符号"}
-      </p>
       <Password
         label="确认密码"
         name="confirmPassword"
         value={confirmation}
         onChange={setConfirmation}
+        success={confirmation && confirmation === password ? "两次输入一致" : undefined}
         validate={text => text !== password ? "两次输入的密码不一致" : ""}
       />
-      {confirmation && confirmation === password && <p className="match-status">两次输入一致</p>}
     </>
   );
 }
@@ -198,7 +204,7 @@ export function CodeField({ label = "验证码", name = "code" }: {
       name={name}
       autoComplete="one-time-code"
       inputMode="numeric"
-      hint={`${rules.verification_code_digits} 位数字，可直接粘贴`}
+      hint={`${rules.verification_code_digits} 位数字`}
       validate={text => new RegExp(`^[0-9]{${rules.verification_code_digits}}$`).test(text)
         ? "" : `请输入 ${rules.verification_code_digits} 位数字验证码`
       }

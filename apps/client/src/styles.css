@@ -284,23 +284,27 @@ input:not([type="checkbox"]):not([type="file"]) {
 input[aria-invalid="true"] { border-color: var(--error) !important; }
 .password-rules {
   list-style: none;
-  padding: 12px 16px;
-  margin: -4px 0 0;
-  border-radius: 8px;
-  background: var(--subtle);
+  padding: 0;
+  margin: -4px 0 20px;
   font-size: 13px;
   color: var(--muted);
   display: grid;
   gap: 8px;
 }
-.password-rules li { display: flex; gap: 8px; align-items: baseline; }
+.password-rules li { display: flex; gap: 8px; align-items: center; }
 .password-rules [data-met="true"] { color: var(--accent); }
-.password-status, .match-status {
-  font-size: 13px;
-  color: var(--accent);
-  margin: 8px 0 20px;
+.password-rules svg, .password-success {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
-.match-status { margin-top: -12px; }
+.password-success { position: absolute; right: 58px; top: 45px; color: var(--accent); }
+.password-field.has-success input { padding-right: 88px !important; }
 .password-field input {
   padding-right: 56px !important;
 }
@@ -346,17 +350,12 @@ input[aria-invalid="true"] { border-color: var(--error) !important; }
 .verification-help { display: grid; gap: 6px; margin: -8px 0 20px; }
 .verification-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
 .feedback {
-  padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  margin: 0 0 20px;
   color: var(--text);
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 .error {
-  border-color: color-mix(in srgb, var(--error) 30%, var(--line));
-  background: color-mix(in srgb, var(--error) 5%, var(--surface));
   color: var(--error);
 }
 .sidebar {
@@ -476,19 +475,6 @@ input[aria-invalid="true"] { border-color: var(--error) !important; }
 }
 .back {
   margin: -16px 0 20px;
-}
-.deletion-warning {
-  border-left: 3px solid var(--error);
-  padding: 12px 20px;
-  margin: 24px 0;
-  background: var(--subtle);
-}
-.deletion-warning h2 {
-  color: var(--error);
-}
-.deletion-warning p {
-  margin-bottom: 0;
-  font-size: 15px;
 }
 .checkbox {
   display: flex;

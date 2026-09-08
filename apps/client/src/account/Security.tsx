@@ -43,7 +43,6 @@ export default function Security({
     <>
       {view === "security" && (
         <>
-          <p className="description">管理登录方式与账号安全。</p>
           <div className="settings-list">
             <div>
               <div>
@@ -170,12 +169,6 @@ export default function Security({
       )}
       {view === "delete" && (
         <>
-          <div className="deletion-warning">
-            <h2>注销后无法恢复</h2>
-            <p>
-              账号、昵称、头像及关联个人数据（包括学习记录）将被永久删除。所有设备会立即退出登录。
-            </p>
-          </div>
           <Form
             busy={busy}
             submit={(data) =>

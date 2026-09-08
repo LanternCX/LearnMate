@@ -38,7 +38,6 @@ export default function AuthForms({
     <>
       {view === "login" && (
         <>
-          <p className="description">使用邮箱和密码，进入你的账号。</p>
           <Form busy={busy} submit={login}>
             <Field
               label="邮箱"

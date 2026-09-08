@@ -154,7 +154,7 @@ export default function App() {
                 )}
               </div>
               {busy && (
-                <p className="hint" role="status">
+                <p className="visually-hidden" role="status">
                   正在处理，请稍候…
                 </p>
               )}
