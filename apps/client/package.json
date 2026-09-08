@@ -11,9 +11,13 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "0.85.1",
+    "@earendil-works/pi-ai": "0.85.1",
     "@tauri-apps/api": "^2.11.1",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-markdown": "10.1.0",
+    "typebox": "1.3.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

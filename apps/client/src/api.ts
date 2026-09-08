@@ -1,4 +1,4 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { Channel, invoke, isTauri } from "@tauri-apps/api/core";
 
 export type User = {
   id: string;
@@ -8,6 +8,74 @@ export type User = {
 };
 let activeUser = "";
 let sessionRevision = 0;
+
+export async function modelRequest(
+  runId: string,
+  payload: object,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const expectedUser = activeUser;
+  const revision = sessionRevision;
+  const body = JSON.stringify({ runId, payload });
+  if (!isTauri())
+    return fetch("/api/learning/model", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Zhiya-Request": "1",
+        "X-Zhiya-User": expectedUser,
+      },
+      body,
+      signal: signal
+        ? AbortSignal.any([signal, AbortSignal.timeout(120000)])
+        : AbortSignal.timeout(120000),
+    });
+  type Part = { status?: number; bytes?: number[]; done?: boolean };
+  return new Promise<Response>((resolve, reject) => {
+    let controller: ReadableStreamDefaultController<Uint8Array>;
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+      },
+    });
+    let ended = false;
+    const fail = (error: unknown) => {
+      if (ended) return;
+      ended = true;
+      controller.error(error);
+      reject(error);
+    };
+    const channel = new Channel<Part>();
+    channel.onmessage = (part) => {
+      if (ended) return;
+      if (revision !== sessionRevision || signal?.aborted) {
+        fail(new Error("会话已中断"));
+        return;
+      }
+      if (part.status)
+        resolve(
+          new Response(stream, {
+            status: part.status,
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+        );
+      if (part.bytes) controller.enqueue(new Uint8Array(part.bytes));
+      if (part.done) {
+        ended = true;
+        controller.close();
+      }
+    };
+    signal?.addEventListener("abort", () => fail(new Error("会话已中断")), {
+      once: true,
+    });
+    void invoke("model_request", {
+      body,
+      expectedUser,
+      onEvent: channel,
+    }).catch(fail);
+  });
+}
 export function setActiveUser(id: string) {
   activeUser = id;
   sessionRevision++;
@@ -47,7 +115,9 @@ export async function api<T = { ok: boolean }>(
       const response = await fetch(`/api${path}`, {
         method,
         credentials: "same-origin",
-        signal: AbortSignal.timeout(__ZHIYA_CLIENT_CONFIG__.requestTimeoutMilliseconds),
+        signal: AbortSignal.timeout(
+          __ZHIYA_CLIENT_CONFIG__.requestTimeoutMilliseconds,
+        ),
         headers: {
           "Content-Type": "application/json",
           "X-Zhiya-Request": "1",

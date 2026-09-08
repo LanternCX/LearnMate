@@ -60,6 +60,7 @@ test("sign out requires confirmation, supports Escape, and preserves edits on ca
   await expect(dialog).not.toBeVisible();
   await expect(logout).toBeFocused();
   expect(exits).toBe(0);
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await page.getByLabel("昵称", { exact: true }).fill("未保存");
   await logout.click();
   await expect(dialog).toContainText("尚未保存");

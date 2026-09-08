@@ -81,11 +81,13 @@ test("a learner can register, edit their profile, and permanently delete their a
     .getByLabel("密码", { exact: true })
     .fill("芽芽芽芽芽芽芽芽");
   await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByRole("heading", { name: "个人资料" })).toBeVisible();
   await page.getByLabel("昵称", { exact: true }).fill("小芽同学");
   await page.getByRole("button", { name: "保存昵称" }).click();
   await expect(page.getByRole("status")).toContainText("昵称已保存");
   await page.reload();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByLabel("昵称", { exact: true })).toHaveValue(
     "小芽同学",
   );
@@ -102,6 +104,7 @@ test("a learner can register, edit their profile, and permanently delete their a
     "尚未保存的昵称",
   );
   await page.reload();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByAltText("当前头像")).toBeVisible();
   await page.getByRole("button", { name: "恢复默认头像" }).click();
   await page.getByRole("button", { name: "保存头像" }).click();
@@ -109,6 +112,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   await expect(page.getByAltText("当前头像")).not.toBeVisible();
   const anotherTab = await page.context().newPage();
   await anotherTab.goto("/");
+  await anotherTab.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(
     anotherTab.getByRole("heading", { name: "个人资料" }),
   ).toBeVisible();
@@ -132,6 +136,7 @@ test("a learner can register, edit their profile, and permanently delete their a
     .getByLabel("密码", { exact: true })
     .fill("A-changed-test-password-123");
   await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByRole("heading", { name: "个人资料" })).toBeVisible();
   await page.getByRole("button", { name: "账号安全", exact: true }).click();
   await page.getByRole("button", { name: "更换邮箱", exact: true }).click();
@@ -169,6 +174,7 @@ test("a learner can register, edit their profile, and permanently delete their a
     .getByLabel("密码", { exact: true })
     .fill("A-recovered-test-password-123");
   await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByRole("heading", { name: "个人资料" })).toBeVisible();
   await page.getByRole("button", { name: "账号安全", exact: true }).click();
   await page.getByRole("button", { name: "注销账号", exact: true }).click();

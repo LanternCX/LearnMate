@@ -60,7 +60,7 @@ export function useAccount() {
       setActiveUser(me.id);
       setUser(me);
       setNickname(me.nickname);
-      setView("profile");
+      setView("home");
     } catch (err) {
       if (generation !== epoch.current) return;
       if (rulesLoaded && err instanceof APIError && err.status === 401) {

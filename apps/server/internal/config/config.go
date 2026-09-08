@@ -19,11 +19,17 @@ import (
 )
 
 type Config struct {
+	Model       Model    `yaml:"model"`
 	Development bool     `yaml:"development"`
 	Server      Server   `yaml:"http"`
 	Database    Database `yaml:"database"`
 	SMTP        SMTP     `yaml:"smtp"`
 	Account     Account  `yaml:"account"`
+}
+type Model struct {
+	Endpoint string `yaml:"endpoint"`
+	ID       string `yaml:"id"`
+	APIKey   string `yaml:"api_key"`
 }
 type Server struct {
 	Listen                   string `yaml:"listen"`
@@ -162,6 +168,15 @@ func override(value reflect.Value, prefix string, known map[string]bool) error {
 }
 
 func (c Config) Validate() error {
+	if c.Model.Endpoint != "" {
+		u, err := url.Parse(c.Model.Endpoint)
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(c.Development && u.Scheme == "http" && loopback(u.Hostname()))) {
+			return fmt.Errorf("model.endpoint must be an HTTPS URL (loopback HTTP allowed in development)")
+		}
+		if c.Model.ID == "" {
+			return fmt.Errorf("model.id is required when model.endpoint is configured")
+		}
+	}
 	// All numeric settings are positive and bounded to avoid duration/size overflow.
 	if err := positive(reflect.ValueOf(c), ""); err != nil {
 		return err

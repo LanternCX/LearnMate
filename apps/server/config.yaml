@@ -2,6 +2,13 @@
 # Override a field with ZHIYA_SERVER_<SECTION>_<KEY>.
 development: true
 
+# OpenAI-compatible Chat Completions endpoint, including /v1/chat/completions.
+# Leave empty to run account services without a model. Never put live keys here.
+model:
+  endpoint: ""
+  id: ""
+  api_key: ""
+
 http:
   listen: "127.0.0.1:8080"
   origin: "http://127.0.0.1:1420"

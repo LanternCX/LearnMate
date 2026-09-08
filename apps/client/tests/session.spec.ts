@@ -76,6 +76,7 @@ test("canceling navigation preserves profile edits and returns focus", async ({
     }),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await page.getByLabel("昵称", { exact: true }).fill("未保存的昵称");
   const security = page.getByRole("button", { name: "账号安全", exact: true });
   await security.click();

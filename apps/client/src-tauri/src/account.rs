@@ -1,6 +1,7 @@
 use keyring::Entry;
 use reqwest::{blocking::Client, header, Method};
 use serde::Serialize;
+use std::io::Read;
 use std::{sync::Mutex, time::Duration};
 
 static ACCOUNT_REQUEST_LOCK: Mutex<()> = Mutex::new(());
@@ -15,6 +16,10 @@ fn allowed(method: &str, path: &str) -> bool {
     matches!(
         (method, path),
         ("GET", "/me")
+            | ("GET", "/learning")
+            | ("GET", "/learning/model")
+            | ("POST", "/learning/action")
+            | ("POST", "/learning/sync")
             | ("GET", "/account-rules")
             | ("PATCH", "/me")
             | ("DELETE", "/me")
@@ -32,6 +37,15 @@ fn allowed(method: &str, path: &str) -> bool {
     )
 }
 
+#[test]
+fn learning_bridge_accepts_only_fixed_learning_routes() {
+    assert!(allowed("GET", "/learning"));
+    assert!(allowed("POST", "/learning/action"));
+    assert!(allowed("POST", "/learning/sync"));
+    assert!(!allowed("POST", "/learning/../auth/login"));
+    assert!(!allowed("POST", "/learning/model"));
+}
+
 fn request(
     path: String,
     method: String,
@@ -44,9 +58,18 @@ fn request(
     if cfg!(target_os = "android") {
         return Err("Android secure credential storage must be configured before use".into());
     }
-    let _guard = ACCOUNT_REQUEST_LOCK
-        .lock()
-        .map_err(|_| "Account request unavailable")?;
+    // Learning requests cannot mutate native credentials and must run alongside
+    // long polling. Account identity changes retain their existing mutex.
+    let learning = path.starts_with("/learning");
+    let _guard = if learning {
+        None
+    } else {
+        Some(
+            ACCOUNT_REQUEST_LOCK
+                .lock()
+                .map_err(|_| "Account request unavailable")?,
+        )
+    };
     let base = api_origin()?;
     let entry = Entry::new("com.lanterncx.zhiya.session", base)
         .map_err(|_| "Secure storage unavailable")?;
@@ -80,7 +103,9 @@ fn request(
         .send()
         .map_err(|_| "Unable to connect to account server")?;
     let status = response.status().as_u16();
-    store_session(&entry, &client, base, response.headers())?;
+    if !learning {
+        store_session(&entry, &client, base, response.headers())?;
+    }
     let body = response
         .text()
         .map_err(|_| "Unable to read account response")?;
@@ -106,6 +131,80 @@ fn api_origin() -> Result<&'static str, String> {
         return Err("Invalid application configuration: HTTPS origin required".into());
     }
     Ok(base)
+}
+
+#[derive(Clone, Serialize)]
+pub struct ModelPart {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    bytes: Option<Vec<u8>>,
+    done: bool,
+}
+
+#[tauri::command]
+pub async fn model_request(
+    body: String,
+    expected_user: String,
+    on_event: tauri::ipc::Channel<ModelPart>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if cfg!(target_os = "android") {
+            return Err("Android secure credential storage must be configured before use".into());
+        }
+        let base = api_origin()?;
+        let entry = Entry::new("com.lanterncx.zhiya.session", base)
+            .map_err(|_| "Secure storage unavailable")?;
+        let token = entry
+            .get_password()
+            .map_err(|_| "Unable to read secure storage")?;
+        let client = Client::builder()
+            .timeout(Duration::from_secs(120))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|_| "Network unavailable")?;
+        let mut response = client
+            .post(format!("{}/api/learning/model", base.trim_end_matches('/')))
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("X-Zhiya-Request", "1")
+            .header("X-Zhiya-User", expected_user)
+            .header(header::COOKIE, format!("zhiya_session={token}"))
+            .body(body)
+            .send()
+            .map_err(|_| "Unable to connect to model proxy")?;
+        on_event
+            .send(ModelPart {
+                status: Some(response.status().as_u16()),
+                bytes: None,
+                done: false,
+            })
+            .map_err(|_| "Stream closed")?;
+        let mut buffer = [0u8; 8192];
+        loop {
+            let n = response
+                .read(&mut buffer)
+                .map_err(|_| "Unable to read model response")?;
+            if n == 0 {
+                break;
+            }
+            on_event
+                .send(ModelPart {
+                    status: None,
+                    bytes: Some(buffer[..n].to_vec()),
+                    done: false,
+                })
+                .map_err(|_| "Stream closed")?;
+        }
+        on_event
+            .send(ModelPart {
+                status: None,
+                bytes: None,
+                done: true,
+            })
+            .map_err(|_| "Stream closed".to_string())
+    })
+    .await
+    .map_err(|_| "Model request failed".to_string())?
 }
 
 fn configured_request_timeout_seconds() -> u64 {
