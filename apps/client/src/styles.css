@@ -265,13 +265,36 @@ input:not([type="checkbox"]):not([type="file"]) {
   position: relative;
 }
 .password-field input {
-  padding-right: 64px !important;
+  padding-right: 56px !important;
 }
 .password-toggle {
   position: absolute;
-  right: 12px;
+  right: 5px;
   top: 33px;
-  font-size: 13px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+.password-toggle:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.password-toggle:focus-visible {
+  outline-offset: -2px;
+}
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .hint {
   font-size: 13px;
@@ -285,13 +308,16 @@ input:not([type="checkbox"]):not([type="file"]) {
 }
 .feedback {
   padding: 12px 16px;
-  border-left: 3px solid var(--accent);
-  background: var(--subtle);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  color: var(--text);
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 .error {
-  border-color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 30%, var(--line));
+  background: color-mix(in srgb, var(--error) 5%, var(--surface));
   color: var(--error);
 }
 .sidebar {

@@ -51,13 +51,23 @@ export function Password({ current = false }: { current?: boolean }) {
         maxLength={rules.password_max_bytes}
       />
       <button
-        className="text-button password-toggle"
+        className="password-toggle"
         type="button"
         aria-pressed={visible}
         aria-label={visible ? "隐藏密码" : "显示密码"}
+        title={visible ? "隐藏密码" : "显示密码"}
         onClick={() => setVisible(!visible)}
       >
-        {visible ? "隐藏" : "显示"}
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          {visible ? (
+            <path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.5 5.3A10.5 10.5 0 0 1 12 5c6 0 10 7 10 7a18 18 0 0 1-3.1 3.8M6.2 6.2A20 20 0 0 0 2 12s4 7 10 7a11 11 0 0 0 5.8-1.8" />
+          ) : (
+            <>
+              <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" />
+              <circle cx="12" cy="12" r="3" />
+            </>
+          )}
+        </svg>
       </button>
     </div>
   );

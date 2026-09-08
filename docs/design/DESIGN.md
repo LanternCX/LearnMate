@@ -168,6 +168,14 @@ Images serve learning. Keep aspect ratios and label positions consistent within 
 
 连续氛围动画仅用于账号入口，不扩展到需要持续阅读的课堂。教学动画应服务于概念解释，并提供暂停和文字说明；避免强制音频。深浅色均须检查动画完整过程中的对比度，正文和输入区域保持清晰、稳定。
 
+### 提示文案与表单反馈
+
+- 提示直接说明结果或下一步操作，使用学生能理解的日常语言，删除“若该邮箱符合条件”“已申请发送”等含糊措辞。无法确认邮件实际发送时，使用“请查看邮箱，在 10 分钟内填写验证码”这类操作指引，不声称已经发送；有效期按实际配置显示。
+- 成功、错误和字段辅助提示末尾不加句号。优先使用简短单句，不堆叠重复说明；需要说明多个相关信息时，保留必要的分隔。
+- 不把内部技术限制直接交给用户理解。例如，密码太短时提示“密码至少需要 8 个字符”，过长时提示“密码太长，请缩短后重试”，不将字符数与字节数混在一条提示中。具体限制使用当前服务端规则，本指南不定义账号策略。
+- 密码显示／隐藏使用眼睛、划线眼睛 SVG 图标，不显示“显示”“隐藏”文字按钮。图标沿用现有线条风格，并保留可访问名称、状态、键盘焦点和至少 44 × 44 的触控区域。
+- 提示组件与所在表单共用圆角、细边框、语义配色和间距。错误提示使用克制的背景色和清晰文字，不使用与页面不协调的左侧竖线色块。深浅主题、窄屏和长文案都应保持可读且不溢出。
+
 ## Language and student data
 
 Invite students to look again at an image's features rather than merely declaring an answer wrong. Describe a need for a hint in this attempt rather than labeling the student as incapable. Tie encouragement to specific actions; avoid empty praise and streak pressure. Distinguish the companion and student with explicit role labels, using color only as a supporting cue.

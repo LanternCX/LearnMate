@@ -63,7 +63,7 @@ export default function Profile({
                 !["image/png", "image/jpeg"].includes(file.type)
               ) {
                 setError(
-                  `请选择 ${rules.avatar_max_bytes / (1024 * 1024)} MB 以内的 PNG 或 JPEG 图片。`,
+                  `请选择 ${rules.avatar_max_bytes / (1024 * 1024)} MB 以内的 PNG 或 JPEG 图片`,
                 );
                 event.target.value = "";
                 return;
@@ -77,7 +77,7 @@ export default function Profile({
                   setError("");
                 }
               };
-              current.onerror = () => setError("无法读取图片，请重新选择。");
+              current.onerror = () => setError("无法读取图片，请重新选择");
               current.readAsDataURL(file);
               event.target.value = "";
             }}
@@ -101,7 +101,7 @@ export default function Profile({
             )}
           </div>
           <p className="hint">
-            PNG 或 JPEG，最大 {rules.avatar_max_bytes / (1024 * 1024)} MB，边长不超过 {rules.avatar_max_dimension} 像素。
+            PNG 或 JPEG，最大 {rules.avatar_max_bytes / (1024 * 1024)} MB，边长不超过 {rules.avatar_max_dimension} 像素
           </p>
           {avatarDraft !== null && (
             <button
@@ -114,7 +114,7 @@ export default function Profile({
                   });
                   await refresh();
                   setAvatarDraft(null);
-                  setNotice("头像已保存。");
+                  setNotice("头像已保存");
                 })
               }
             >
@@ -130,7 +130,7 @@ export default function Profile({
             await api("/me", "PATCH", { nickname });
             const saved = await refresh();
             setNickname(saved.nickname);
-            setNotice("昵称已保存。");
+            setNotice("昵称已保存");
           })
         }
       >

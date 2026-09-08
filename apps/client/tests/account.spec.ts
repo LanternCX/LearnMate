@@ -49,15 +49,27 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page.getByRole("button", { name: "发送验证码", exact: true }).click();
   const code = await emailCode(request, email, "注册账号");
   await page.getByLabel("验证码", { exact: true }).fill(code);
+  const password = page.getByLabel("密码", { exact: true });
+  await password.fill("1234567");
+  await page.getByRole("button", { name: "完成注册", exact: true }).click();
+  await expect(page.getByRole("alert")).toHaveText("密码至少需要 8 个字符");
+  await expect(password).toHaveAttribute("type", "password");
+  const showPassword = page.getByRole("button", { name: "显示密码", exact: true });
+  await expect(showPassword).toHaveText("");
+  await showPassword.click();
+  await expect(password).toHaveAttribute("type", "text");
+  await expect(password).toHaveValue("1234567");
+  await page.getByRole("button", { name: "隐藏密码", exact: true }).click();
+  await expect(password).toHaveAttribute("type", "password");
   await page
     .getByLabel("密码", { exact: true })
-    .fill("A-long-test-password-123");
+    .fill("芽芽芽芽芽芽芽芽");
   await page.getByRole("button", { name: "完成注册", exact: true }).click();
   await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
   await page.getByLabel("邮箱", { exact: true }).fill(email);
   await page
     .getByLabel("密码", { exact: true })
-    .fill("A-long-test-password-123");
+    .fill("芽芽芽芽芽芽芽芽");
   await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page.getByRole("heading", { name: "个人资料" })).toBeVisible();
   await page.getByLabel("昵称", { exact: true }).fill("小芽同学");
@@ -94,7 +106,7 @@ test("a learner can register, edit their profile, and permanently delete their a
   await page.getByRole("button", { name: "修改密码", exact: true }).click();
   await page
     .getByLabel("当前密码", { exact: true })
-    .fill("A-long-test-password-123");
+    .fill("芽芽芽芽芽芽芽芽");
   await page
     .getByLabel("密码", { exact: true })
     .fill("A-changed-test-password-123");

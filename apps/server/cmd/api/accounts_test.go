@@ -395,12 +395,22 @@ func TestPublicAccountRulesMatchServerValidation(t *testing.T) {
 		}
 	}
 	minPassword := int(rules["password_min_characters"].(float64))
+	if minPassword != 8 {
+		t.Fatalf("minimum password length = %d; want 8", minPassword)
+	}
 	flow := a.request(c, "POST", "/auth/register/start", map[string]string{"email": "rules@example.com"}, 200)["flow"].(string)
 	code := a.mail["rules@example.com:register"]
 	if len(code) != int(rules["verification_code_digits"].(float64)) {
 		t.Fatal("code length disagrees with public rules")
 	}
-	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": strings.Repeat("a", minPassword-1)}, 400)
+	short := a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": "1234567"}, 400)
+	if short["error"] != "密码至少需要 8 个字符" {
+		t.Fatalf("unexpected short password message: %v", short)
+	}
+	long := a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": strings.Repeat("芽", 86)}, 400)
+	if long["error"] != "密码太长，请缩短后重试" {
+		t.Fatalf("unexpected long password message: %v", long)
+	}
 	password := strings.Repeat("a", minPassword)
 	a.request(c, "POST", "/auth/register/complete", map[string]string{"flow": flow, "code": code, "password": password}, 200)
 	a.request(c, "POST", "/auth/login", map[string]string{"email": "rules@example.com", "password": password}, 200)

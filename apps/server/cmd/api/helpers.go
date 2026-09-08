@@ -40,7 +40,7 @@ func (a *application) respondError(w http.ResponseWriter, err error) {
 		e = failure{429, err.Error()}
 	default:
 		log.Printf("account operation failed: %T", err)
-		e = failure{500, "服务暂时不可用，请稍后重试。"}
+		e = failure{500, "服务暂时不可用，请稍后重试"}
 	}
 	if e.status == 429 {
 		w.Header().Set("Retry-After", strconv.Itoa(a.config.Account.RateWindowSeconds))
@@ -52,18 +52,18 @@ func (a *application) readJSON(w http.ResponseWriter, r *http.Request, value any
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(value); err != nil {
-		return bad("提交内容无效或过大。")
+		return bad("提交内容无效或过大")
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		return bad("提交内容无效。")
+		return bad("提交内容无效")
 	}
 	return nil
 }
 func (a *application) passwordLength(passwords ...string) error {
 	for _, password := range passwords {
 		if len(password) > data.PasswordMaxBytes {
-			return bad("密码过长。")
+			return bad("密码太长，请缩短后重试")
 		}
 	}
 	return nil

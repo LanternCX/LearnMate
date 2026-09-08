@@ -8,6 +8,7 @@ test("account forms use the server's current public rules", async ({ page }) => 
     policy.password_min_characters = 16;
     policy.password_max_bytes = 128;
     policy.verification_code_digits = 6;
+    policy.verification_ttl_seconds = 180;
     await route.fulfill({ response, json: policy });
   });
   await page.route("**/api/auth/register/start", route =>
@@ -18,7 +19,8 @@ test("account forms use the server's current public rules", async ({ page }) => 
   await page.getByRole("button", { name: "注册账号", exact: true }).click();
   await page.getByLabel("邮箱", { exact: true }).fill("policy@example.com");
   await page.getByRole("button", { name: "发送验证码", exact: true }).click();
-  await expect(page.getByText("密码至少 16 个字符。", { exact: true })).toBeVisible();
+  await expect(page.getByText("密码至少 16 个字符", { exact: true })).toBeVisible();
+  await expect(page.getByRole("status")).toHaveText("请查看邮箱，在 3 分钟内填写验证码");
   await expect(page.getByLabel("验证码", { exact: true })).toHaveAttribute("maxlength", "6");
 });
 

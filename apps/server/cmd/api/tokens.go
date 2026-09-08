@@ -16,11 +16,11 @@ func (a *application) sendChallenge(ctx context.Context, models data.Models, pur
 		return "", err
 	}
 	if err = a.send(email, purpose, codes.Code); err != nil {
-		return "", failure{503, "邮件发送失败，请稍后重新获取。"}
+		return "", failure{503, "邮件发送失败，请稍后重新获取"}
 	}
 	if newEmail != "" {
 		if err = a.send(newEmail, "email-new", codes.NewCode); err != nil {
-			return "", failure{503, "邮件发送失败，请稍后重新获取。"}
+			return "", failure{503, "邮件发送失败，请稍后重新获取"}
 		}
 	}
 	return codes.Flow, nil
@@ -118,7 +118,7 @@ func (a *application) login(w http.ResponseWriter, r *http.Request) {
 	err = a.models.Transaction(r.Context(), data.StandardTransaction, func(models data.Models) error {
 		u, err := models.Users.Authenticate(r.Context(), email, in.Password)
 		if errors.Is(err, data.ErrNotFound) {
-			return failure{401, "邮箱或密码不正确。"}
+			return failure{401, "邮箱或密码不正确"}
 		}
 		if err != nil {
 			return err

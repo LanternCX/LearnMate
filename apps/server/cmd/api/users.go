@@ -121,7 +121,7 @@ func (a *application) changePassword(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 		if !u.PasswordMatches(in.CurrentPassword) {
-			return bad("当前密码不正确。")
+			return bad("当前密码不正确")
 		}
 		if err := models.Users.UpdatePassword(r.Context(), u.ID, in.Password); err != nil {
 			return err
@@ -152,14 +152,14 @@ func (a *application) startEmailChange(w http.ResponseWriter, r *http.Request) {
 	var flow string
 	err = a.withUser(r, data.StandardTransaction, func(models data.Models, u data.User) error {
 		if email == u.Email {
-			return bad("请输入不同的新邮箱。")
+			return bad("请输入不同的新邮箱")
 		}
 		exists, err := models.Users.EmailExists(r.Context(), email)
 		if err != nil {
 			return err
 		}
 		if exists {
-			return bad("该邮箱无法使用，请换一个邮箱。")
+			return bad("该邮箱无法使用，请换一个邮箱")
 		}
 		flow, err = a.sendChallenge(r.Context(), models, "email", u.Email, email, u.ID)
 		return err
@@ -210,10 +210,10 @@ func (a *application) deleteAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	err := a.withUser(r, data.IdentityTransaction, func(models data.Models, u data.User) error {
 		if !in.Confirm {
-			return bad("请确认永久删除账号及关联个人数据。")
+			return bad("请确认永久删除账号及关联个人数据")
 		}
 		if !u.PasswordMatches(in.CurrentPassword) {
-			return bad("当前密码不正确。")
+			return bad("当前密码不正确")
 		}
 		if err := models.Tokens.Revoke(r.Context(), u.ID, u.Email); err != nil {
 			return err

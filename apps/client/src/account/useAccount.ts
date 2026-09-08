@@ -85,7 +85,7 @@ export function useAccount() {
   }, []);
 
   function message(err: unknown) {
-    return err instanceof Error ? err.message : "操作失败，请重试。";
+    return err instanceof Error ? err.message : "操作失败，请重试";
   }
   function clearSession(text: string) {
     setActiveUser("");
@@ -111,7 +111,7 @@ export function useAccount() {
     } catch (err) {
       if (generation !== epoch.current) return;
       if (user && err instanceof APIError && err.status === 401)
-        clearSession("登录已失效，请重新登录。");
+        clearSession("登录已失效，请重新登录");
       else setError(message(err));
     } finally {
       if (generation === epoch.current) setBusy(false);
@@ -121,7 +121,7 @@ export function useAccount() {
     const generation = epoch.current;
     const me = await api<User>("/me");
     if (generation !== epoch.current)
-      throw new APIError(409, "账号已切换，请重新操作。");
+      throw new APIError(409, "账号已切换，请重新操作");
     setActiveUser(me.id);
     setUser(me);
     return me;
@@ -163,7 +163,7 @@ export function useAccount() {
     if (generation !== epoch.current) return;
     await run(async () => {
       await api(all ? "/auth/logout-all" : "/auth/logout", "POST", {});
-      clearSession(all ? "已退出全部设备。" : "已退出登录。");
+      clearSession(all ? "已退出全部设备" : "已退出登录");
     });
   }
   function sendCode(purpose: "register" | "reset", target: string) {
@@ -175,7 +175,7 @@ export function useAccount() {
       );
       setFlow({ id: result.flow, email: target });
       setNotice(
-        `若该邮箱符合条件，验证码将发送至邮箱，${policy!.verification_ttl_seconds / 60} 分钟内有效。`,
+        `请查看邮箱，在 ${policy!.verification_ttl_seconds / 60} 分钟内填写验证码`,
       );
     });
   }

@@ -29,11 +29,11 @@ func (a *application) protect(next http.Handler) http.Handler {
 					allowed = scheme + "://" + r.Host
 				}
 				if r.Header.Get("X-Zhiya-Request") != "1" || (origin != "" && origin != allowed) || r.Header.Get("Sec-Fetch-Site") == "cross-site" {
-					a.respondError(w, failure{403, "请求来源无效。"})
+					a.respondError(w, failure{403, "请求来源无效"})
 					return
 				}
 				if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-					a.respondError(w, failure{415, "请使用 JSON 提交。"})
+					a.respondError(w, failure{415, "请使用 JSON 提交"})
 					return
 				}
 			}

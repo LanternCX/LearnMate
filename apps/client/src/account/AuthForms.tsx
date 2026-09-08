@@ -72,7 +72,7 @@ export default function AuthForms({
         <>
           <p className="description">
             {flow
-              ? `验证码已申请发送至 ${flow.email}`
+              ? `请填写 ${flow.email} 收到的验证码`
               : view === "register"
                 ? "验证邮箱后，即可创建账号。"
                 : "通过注册邮箱验证身份，设置新密码。"}
@@ -107,8 +107,8 @@ export default function AuthForms({
                   setFlow(null);
                   setNotice(
                     view === "register"
-                      ? "注册成功，请登录。"
-                      : "密码已重设，请使用新密码登录。所有设备均已退出。",
+                      ? "注册成功，请登录"
+                      : "密码已重设，所有设备均已退出，请使用新密码登录",
                   );
                 })
               }
@@ -121,8 +121,8 @@ export default function AuthForms({
               />
               <Password />
               <p className="hint">
-                密码至少 {rules.password_min_characters} 个字符。
-                {view === "reset" && "重设后所有设备都需要重新登录。"}
+                密码至少 {rules.password_min_characters} 个字符
+                {view === "reset" && "，重设后所有设备都需要重新登录"}
               </p>
               <button className="primary full">
                 {view === "register" ? "完成注册" : "重设密码"}

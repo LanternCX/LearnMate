@@ -21,7 +21,7 @@ import (
 
 // Product constraints change with the application, not with the deployment.
 const (
-	PasswordMinCharacters = 12
+	PasswordMinCharacters = 8
 	PasswordMaxBytes      = 256
 	NicknameMaxCharacters = 40
 	DefaultNickname       = "学习者"
@@ -111,7 +111,7 @@ func (m UserModel) UpdateEmail(ctx context.Context, id, email string) error {
 func (m UserModel) UpdateNickname(ctx context.Context, id, name string) error {
 	name = strings.TrimSpace(name)
 	if !utf8.ValidString(name) || utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > NicknameMaxCharacters {
-		return ValidationError(fmt.Sprintf("昵称需为 1–%d 个字符。", NicknameMaxCharacters))
+		return ValidationError(fmt.Sprintf("昵称需为 1–%d 个字符", NicknameMaxCharacters))
 	}
 	_, err := m.db.Exec(ctx, "UPDATE users SET nickname=$1 WHERE id=$2", name, id)
 	return err
@@ -181,8 +181,11 @@ func passwordMatches(password, encoded string) bool {
 	return subtle.ConstantTimeCompare(actual, expected) == 1
 }
 func (m UserModel) ValidatePassword(s string) error {
-	if utf8.RuneCountInString(s) < PasswordMinCharacters || len(s) > PasswordMaxBytes {
-		return ValidationError(fmt.Sprintf("密码需至少 %d 个字符，且不超过 %d 字节。", PasswordMinCharacters, PasswordMaxBytes))
+	if utf8.RuneCountInString(s) < PasswordMinCharacters {
+		return ValidationError(fmt.Sprintf("密码至少需要 %d 个字符", PasswordMinCharacters))
+	}
+	if len(s) > PasswordMaxBytes {
+		return ValidationError("密码太长，请缩短后重试")
 	}
 	return nil
 }
@@ -190,7 +193,7 @@ func NormalizeEmail(s string) (string, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	a, err := mail.ParseAddress(s)
 	if err != nil || a.Address != s || len(s) > 254 || !strings.Contains(s, ".") {
-		return "", ValidationError("请输入有效的邮箱地址。")
+		return "", ValidationError("请输入有效的邮箱地址")
 	}
 	return s, nil
 }
@@ -199,7 +202,7 @@ func (m UserModel) validatedAvatar(value string) ([]byte, error) {
 	if value == "" {
 		return nil, nil
 	}
-	fail := ValidationError(fmt.Sprintf("头像仅支持 %g MB 以内、边长不超过 %d 像素的 PNG 或 JPEG 图片。", float64(AvatarMaxBytes)/(1024*1024), AvatarMaxDimension))
+	fail := ValidationError(fmt.Sprintf("头像仅支持 %g MB 以内、边长不超过 %d 像素的 PNG 或 JPEG 图片", float64(AvatarMaxBytes)/(1024*1024), AvatarMaxDimension))
 	parts := strings.SplitN(value, ",", 2)
 	if len(parts) != 2 || (parts[0] != "data:image/png;base64" && parts[0] != "data:image/jpeg;base64") {
 		return nil, fail

@@ -100,13 +100,13 @@ export default function Security({
                   currentPassword: data.get("currentPassword"),
                   password: data.get("password"),
                 });
-                clearSession("密码已修改，请使用新密码登录。");
+                clearSession("密码已修改，请使用新密码登录");
               })
             }
           >
             <Password current />
             <Password />
-            <p className="hint">新密码至少 {rules.password_min_characters} 个字符。</p>
+            <p className="hint">新密码至少 {rules.password_min_characters} 个字符</p>
             <button className="primary">保存新密码</button>
           </Form>
         </>
@@ -128,7 +128,7 @@ export default function Security({
                     { email: target },
                   );
                   setFlow({ id: result.flow, email: target });
-                  setNotice("验证码已分别发送至原邮箱和新邮箱。");
+                  setNotice("验证码已分别发送至原邮箱和新邮箱");
                 })
               }
             >
@@ -154,7 +154,7 @@ export default function Security({
                   await refresh();
                   setFlow(null);
                   setView("security");
-                  setNotice("邮箱已更换，请使用新邮箱登录。");
+                  setNotice("邮箱已更换，请使用新邮箱登录");
                 })
               }
             >
@@ -188,7 +188,7 @@ export default function Security({
               </button>
             </Form>
           )}
-          <p className="hint">无法访问原邮箱时，暂不支持人工申诉更换。</p>
+          <p className="hint">无法访问原邮箱时，暂不支持人工申诉更换</p>
         </>
       )}
       {view === "delete" && (
@@ -207,7 +207,7 @@ export default function Security({
                   currentPassword: data.get("currentPassword"),
                   confirm: data.get("confirm") === "on",
                 });
-                clearSession("账号已注销，关联个人数据已删除。");
+                clearSession("账号已注销，关联个人数据已删除");
               })
             }
           >
