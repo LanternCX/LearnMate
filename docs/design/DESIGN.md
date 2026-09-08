@@ -54,7 +54,7 @@ For younger students, use more images, concrete examples, and conversational gui
 
 ## Color and surfaces
 
-Both themes share semantic names. Follow the system appearance; settings may offer a preference, but the classroom should not feature a prominent theme switcher.
+两套配色共用语义色彩。主题切换参考 [Cao Xin 的博客](https://www.caoxin.xyz/)，提供“自动 → 浅色 → 深色”的循环选择，而非三套独立配色。默认跟随系统，手动选择应在刷新后保留；只有自动模式响应系统外观变化。顶栏右侧使用轻量图标按钮，以半圆、太阳和月亮区分状态，并通过可访问名称说明当前状态与下一次点击的结果。
 
 | Token | Sage light | Graphite dark | Purpose |
 | --- | --- | --- | --- |
@@ -92,6 +92,17 @@ Use Noto Sans SC throughout the functional interface, including page and lesson 
 Do not shrink an individual heading to preserve a layout. Adjust the copy, measure, or arrangement first. Allow natural Chinese wrapping without inserting spaces to simulate tracking. Left-align body text, favor clear short sentences, and generally keep reading measures around 28–36 Chinese characters.
 
 Prioritize function and brevity in interface copy. State the task, result, or next action directly. Omit motivational slogans, repeated explanations, and routine reassurance. Keep teaching explanations and questions when they support understanding; do not repeat the heading in supporting text. Use short, specific button labels. Reserve companion labels for actual dialogue, and report learning evidence without claiming mastery from a single answer. Error messages should state the problem and available recovery action.
+
+### 用 UI 表达，不重复解释 UI
+
+这是所有页面、组件与后续改动必须遵守的规则：图标、控件状态、布局或交互已能清楚表达的信息，不再用可见文字重复解释。先判断用户还缺少什么信息，再决定是否需要文案。
+
+- 选中状态、密码匹配、规则满足、显示／隐藏和提交进度优先通过对应控件表达。不在已打勾的规则下再写“密码符合要求”，也不在已有进度状态旁再放一段“正在处理，请稍候”。
+- 不解释常见控件的常规用法，不重复标题、字段标签或按钮名称。文字只补充 UI 无法传达的信息，例如具体限制、错误原因、恢复方法和不可逆操作的实际后果。
+- 颜色不能单独承担状态表达；配合一致的 SVG 图形或控件形态。图标保留可访问名称，必要的状态通过屏幕阅读器播报，无需为此增加重复的可见文案。
+- 不使用锐角矩形、整块底色或左侧竖线的 Notice／Alert 作为通用提示容器。普通反馈就地呈现，不为每条提示另加卡片；把方形提示框改成圆角提示框不能解决多余容器的问题。
+- 不可逆操作的具体后果集中在最终确认弹窗中说明，页面保留明确的操作名称和必要的确认控件，不再重复堆叠警告标题与说明块。确认弹窗沿用现有浮层样式。
+- 审核每条提示时检查：去掉它是否会使用户缺少决策、纠错或继续操作所需的信息？若不会，就删除。不要为了视觉简洁隐瞒失败或删掉必要的教学解释。
 
 ## Spacing and responsive composition
 
@@ -133,7 +144,7 @@ These rules govern presentation and reference the corresponding PRD sections wit
 
 ### Practice and experiment feedback
 
-Selected, correct, and try-again states need both words and visual cues. Do not clear an answer after an incorrect submission. Offer an actionable hint and another attempt; the timing of answer disclosure follows teaching requirements.
+Selected, correct, and try-again states need distinguishable visual cues and accessible semantics. Add words when they explain the result or the next step, not merely to repeat the state. Do not clear an answer after an incorrect submission. Offer an actionable hint and another attempt; the timing of answer disclosure follows teaching requirements.
 
 Experiment data counts, parameters, outputs, and execution states must correspond. Label illustrative results as examples and do not generalize from a single run. Parameters need visible labels, ranges, and current values. Do not present unresolved programming languages or debugging capabilities as supported product commitments.
 
@@ -151,7 +162,30 @@ Make the question input the primary entry point in the classroom controls. Place
 
 Images serve learning. Keep aspect ratios and label positions consistent within a set. Classification labels must unambiguously correspond to their images. Missing images need an explanation and recovery state rather than an empty box. Use supplied assets or materials with clear provenance and usage conditions. Never substitute an image of the reference screen for editable interface content.
 
-Default to stillness. State changes may use 150–220ms fades or layout transitions to clarify pausing, expansion, and resumption. Respect reduced-motion preferences. Teaching animations may explain concepts but require pause controls and textual explanations. Avoid decorative loops, typewriter effects, parallax, and forced audio.
+### 账号入口的构图与动效
+
+登录、注册和找回密码页采用同一套入口视觉。顶栏的叶芽图标、知芽字标和主题按钮直接融入背景，不使用卡片背景、边框或阴影，也不附加宣传短句或背景播放按钮。桌面端将欢迎区与表单整体放在顶栏和页脚之间，使上下留白均衡；页脚位于短页面底部，长页面则随内容自然向下排列。手机端使用单列，优先保证表单完整可用。
+
+入口应有适中的信息密度：欢迎文字靠近表单，避免窄小控件被大片留白包围。优先放大表单文字、输入框和主按钮，并收紧栏间距、表单内边距与字段间距；不通过整体缩放页面或压缩触控区域实现紧凑。较窄窗口允许文字自然换行，同时保留清晰的标签与完整操作区。
+
+入口背景由大小、轮廓和明暗不同的柔边色块组成，以鼠尾草色为主，辅以少量暖色与亮部。色块独立漂移、缓慢变形并自然交叠，应能辨认出不规则的明暗区域，避免整张渐变图旋转、平行光带或规则圆球。动态氛围参考用户指定的 [Codex 页面](https://openai.com/zh-Hans-CN/codex/)，不要求复制其素材或实现。用户停留数秒便应能看出色块位置与轮廓的变化。变化应连续平滑，不出现闪烁、明显循环接缝、裸露的图层边缘或抢夺注意力的高亮。
+
+- 不同色块采用不同的漂移速度、起始位置和变化阶段，避免同步往返；以十几秒至二十几秒的缓慢变化为调校起点，兼顾可感知的移动与平静的氛围。
+- 鼠标移动带动背景产生柔和、有边界的偏移，表单和文字保持稳定。触屏无需模拟鼠标跟随，也不阻拦滚动或输入。
+- 页面进入和账号视图切换使用约 240–480ms 的淡入与小幅上移；避免整页缩放、弹跳和逐字出现。验证码等步骤的内容切换也应有连贯反馈，不清空已有输入来制造动画。
+- 按钮悬停轻微上移，按下轻微收缩；输入框聚焦时平滑突出边界。交互反馈以约 150–220ms 为起点，不延迟操作执行。
+- 提交中的动作在控件内表达进度与禁用状态，并提供可访问状态播报，不额外堆叠等待说明。结果反馈与确认弹窗轻柔出现；关闭动效后，状态仍须可辨认。
+- 开启系统“减少动态效果”时，关闭背景循环、鼠标跟随、位移动画和进度旋转，保留静态背景、焦点指示与状态文字。动画不可承担唯一的信息表达。
+
+连续氛围动画仅用于账号入口，不扩展到需要持续阅读的课堂。教学动画应服务于概念解释，并提供暂停和文字说明；避免强制音频。深浅色均须检查动画完整过程中的对比度，正文和输入区域保持清晰、稳定。
+
+### 提示文案与表单反馈
+
+- 提示直接说明结果或下一步操作，使用学生能理解的日常语言，删除“若该邮箱符合条件”“已申请发送”等含糊措辞。无法确认邮件实际发送时，使用“请查看邮箱，在 10 分钟内填写验证码”这类操作指引，不声称已经发送；有效期按实际配置显示。
+- 成功、错误和字段辅助提示末尾不加句号。优先使用简短单句，不堆叠重复说明；需要说明多个相关信息时，保留必要的分隔。
+- 不把内部技术限制直接交给用户理解。例如，密码太短时提示“密码至少需要 8 个字符”，过长时提示“密码太长，请缩短后重试”，不将字符数与字节数混在一条提示中。具体限制使用当前服务端规则，本指南不定义账号策略。
+- 密码显示／隐藏使用眼睛、划线眼睛 SVG 图标，不显示“显示”“隐藏”文字按钮。图标沿用现有线条风格，并保留可访问名称、状态、键盘焦点和至少 44 × 44 的触控区域。
+- 字段错误就地显示具体原因；表单级失败或无法由控件表达的结果使用简短、无容器的反馈。不要使用背景色块、边框或左侧竖线包裹普通提示。只有需要用户作出决定时才使用确认弹窗。深浅主题、窄屏和长文案都应保持可读且不溢出。
 
 ## Language and student data
 
@@ -175,6 +209,8 @@ Do not expose age, full identity, or internal profile fields on ordinary learnin
 ## Inspect and deliver
 
 Check task clarity first, then hierarchy, reading measure, state feedback, and detail. Inspect desktop and mobile with realistic Chinese copy lengths. Check light and dark themes, long headings, empty states, preparation, failure, and recovery.
+
+动效验收不能只依赖静态截图：连续观察背景至少一次方向变化，实际操作主题切换、注册步骤、表单聚焦、提交与确认弹窗。检查鼠标响应、触屏滚动和减少动态效果模式；刷新后确认主题选择保留。不同高度的窗口都应保持合理留白，动画不得引入页面溢出、遮挡或输入丢失。
 
 Inspect both the complete composition and individual controls. The background, teaching surface, and floating controls must remain distinguishable at a glance and in grayscale. Check glass over different underlying content, with blur disabled, and with opaque fallback surfaces. Verify that its text stays sharp and readable, and that floating panels do not obscure content at narrow widths or with the keyboard open. If the page still reads as a grid of similarly rounded cards, revise the composition rather than adding more blur or stronger shadows.
 

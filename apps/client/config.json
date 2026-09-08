@@ -1,0 +1,5 @@
+{
+  "api_origin": "http://127.0.0.1:8080",
+  "request_timeout_seconds": 25,
+  "dev_origin": "http://127.0.0.1:1420"
+}

@@ -1,0 +1,23 @@
+{
+  "name": "zhiya",
+  "private": true,
+  "workspaces": ["apps/client"],
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "dev": "node scripts/run.mjs client-dev",
+    "dev:desktop": "node scripts/run.mjs desktop-dev",
+    "dev:server": "node scripts/run.mjs server",
+    "dev:services": "node scripts/run.mjs services",
+    "stop:services": "node scripts/run.mjs services-stop",
+    "build": "node scripts/run.mjs client-build",
+    "build:desktop": "node scripts/run.mjs desktop-build",
+    "build:server": "go -C apps/server build -o ../../dist/server ./cmd/api",
+    "check": "npm run check --workspace @zhiya/client",
+    "test": "go -C apps/server test ./... && node --test .github/scripts/check-pr.test.cjs scripts/config.test.mjs",
+    "test:accounts": "node scripts/run.mjs test-accounts",
+    "test:desktop": "node scripts/run.mjs desktop-test",
+    "test:e2e": "node scripts/run.mjs test-e2e",
+    "check:server-config": "node scripts/run.mjs check-server-config",
+    "check:client-config": "node scripts/run.mjs check-client-config"
+  }
+}
