@@ -52,6 +52,34 @@ npm run build:desktop  # 桌面可执行文件构建，不制作安装包
 
 Tauri 开发构建连接本地后端，登录凭证通过原生层保存在系统安全存储中。macOS 使用钥匙串；Windows 使用系统凭据存储；Linux 需要可用且已解锁的 Secret Service。具体平台须在发布前实测。Android 的安全存储、移动端平台工程、签名与发行配置需在确定支持平台后接入；不将内存存储作为保持登录的替代品。
 
+## 产品官网
+
+产品官网位于 `apps/website`，是独立的 React + Vite 静态站点，不调用账号或教学接口。单独开发官网只需 Node.js 22.12+ 和 npm，不需要 Go、Rust、Docker 或模型密钥。在仓库根目录执行 `npm ci` 安装锁定依赖，然后运行：
+
+```sh
+npm run dev:website         # 本机预览：http://127.0.0.1:4174
+npm run check:website       # TypeScript 检查
+npm run test:website        # 开发服务器上的浏览器行为测试
+npm run build:website       # 根路径静态构建，输出到 apps/website/dist
+npm run test:website:pages  # 构建 /zhiya/ 版本并运行同一套浏览器测试
+```
+
+Windows 测试使用已安装的 Microsoft Edge；其他系统首次测试前运行 `npx playwright install --with-deps chromium`。测试自行启动和关闭所需服务器。端口 4174（开发）和 4175（生产预览）应空闲。测试截图保存在 `apps/website/test-results`，不纳入版本控制。
+
+官网包含课程学习、自由知识探索、AI 实验室、课堂步骤、四学段适配、多模态教学和关于知芽。页面采用无卡片边框的开放排版与整页纵向绿色渐变，浅色主题使用黑色文字；不展示项目进展或常见问题栏目。字体通过 Google Fonts 加载，网络不可用时使用本机字体回退。主题支持自动、浅色和深色；浏览器拒绝本地存储时仍可使用，但刷新后不保留手动选择。
+
+首屏为借鉴 Manim 表达方式的 Canvas 2D 数学动画，并非调用 Manim、Three.js 或真实 AI 接口。动画使用固定示例数据与最小二乘直线，依次展示观察、拟合与预测，支持暂停、继续、重播和直接选择章节；播放一次后停止，系统启用减少动态效果时只显示静态结果并保留章节切换。官网只介绍产品，不实现语音教学、模型生成、在线编程、评估或学习记录。
+
+页面内容与交互位于 `apps/website/src/App.tsx`，样式位于 `apps/website/src/styles.css`，首屏动画位于 `apps/website/src/ClassroomScene.tsx`。真实素材和产品入口通过以下方式接入：
+
+- 图片配置位于 `apps/website/src/website-content.ts`：`classroomImages` 对应四个课堂步骤，`stageImages` 对应四个学段，`modalityImages` 对应三项多模态能力。当前地址为空，显示无边框、无说明文字的图片留白；图片加载失败时也回退为留白。填写真实图片的 `src` 和准确的 `alt` 即可，图片保持比例且不裁切。
+- 本地图片可放入 `apps/website/public/images/`。在配置中使用 `import.meta.env.BASE_URL + "images/文件名.png"` 作为地址，可同时适配根路径和 `/zhiya/` 部署；不要把 `/images/...` 写死为根路径。该图片目录按需创建，勿提交未授权素材。
+- 产品入口读取构建时环境变量 `VITE_PRODUCT_URL`，地址须以 `https://` 或 `http://` 开头。未配置时，所有“进入知芽”按钮均禁用，不进行假跳转。本地可在 `apps/website/.env` 中设置，修改后重启开发服务器或重新构建；该文件已被忽略，不提交到 Git。正式部署需在构建环境中注入此变量，当前 Pages 工作流尚未配置真实产品地址。`VITE_` 变量会进入前端产物，不得包含密钥。
+
+`.github/workflows/website-check.yml` 为官网相关 PR 检查类型、浏览器行为及两种部署路径。`.github/workflows/deploy-website.yml` 仅允许 `main` 构建通过测试后部署 GitHub Pages，包括手动触发时；Pages 写权限仅授予部署任务。首次上线须由维护者授权并选择 GitHub Actions 作为 Pages 来源。配置目标为 `https://lanterncx.github.io/zhiya/`，此地址不是已经上线的声明。
+
+项目子路径构建命令为 `npm run build:pages --workspace @zhiya/website`；一般静态托管使用 `npm run build:website`。将对应的 `apps/website/dist` 目录作为发布内容即可，不需要后端服务。上线、修改仓库设置和合并 PR 仍须维护者授权。
+
 ## 配置真实邮件与部署
 
 通过环境变量配置后端，应用不自动加载 `.env` 文件：
