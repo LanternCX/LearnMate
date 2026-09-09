@@ -23,13 +23,16 @@ type application struct {
 }
 
 func main() {
-	path := flag.String("config", os.Getenv("ZHIYA_SERVER_CONFIG"), "configuration file (required unless ZHIYA_SERVER_CONFIG is set)")
+	path := flag.String("config", os.Getenv("ZHIYA_SERVER_CONFIG"), "explicit configuration file; otherwise load config.yaml and optional config.local.yaml")
 	check := flag.Bool("check-config", false, "validate configuration and exit")
 	flag.Parse()
+	var cfg config.Config
+	var err error
 	if *path == "" {
-		log.Fatal("-config or ZHIYA_SERVER_CONFIG is required")
+		cfg, err = config.LoadDefault(".")
+	} else {
+		cfg, err = config.Load(*path)
 	}
-	cfg, err := config.Load(*path)
 	if err != nil {
 		log.Fatal(err)
 	}

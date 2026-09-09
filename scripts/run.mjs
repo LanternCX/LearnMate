@@ -9,7 +9,9 @@ let args;
 
 if (["server", "check-server-config", "test-accounts"].includes(command)) {
   // Pass the filename to Go; Node never parses deployment configuration.
-  env.ZHIYA_SERVER_CONFIG = resolve(root, "apps/server", env.ZHIYA_SERVER_CONFIG ?? "config.yaml");
+  if (env.ZHIYA_SERVER_CONFIG) {
+    env.ZHIYA_SERVER_CONFIG = resolve(root, "apps/server", env.ZHIYA_SERVER_CONFIG);
+  }
   executable = "go";
   args = ["-C", root + "/apps/server"];
   if (command === "test-accounts") {

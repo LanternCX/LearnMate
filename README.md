@@ -134,7 +134,9 @@ npm run build
 
 所有 `_seconds` 字段使用秒。环境变量按 `ZHIYA_SERVER_<SECTION>_<KEY>` 覆盖文件，例如 `ZHIYA_SERVER_HTTP_LISTEN`、`ZHIYA_SERVER_DATABASE_URL`、`ZHIYA_SERVER_SMTP_PASSWORD`；顶层开发标志为 `ZHIYA_SERVER_DEVELOPMENT`。空字符串也是覆盖值。
 
-部署文件可保存在仓库外，或使用已忽略的 `apps/server/config.local.yaml`。npm 命令通过 `ZHIYA_SERVER_CONFIG` 选择，相对路径基于 `apps/server`。可执行文件的 `-config` 优先于该环境变量；直接运行时，相对配置路径基于当前工作目录。`http.web_dir` 始终相对于所选 YAML 文件解析。
+默认运行 `npm run dev:server` 时，先加载 `apps/server/config.yaml`，再逐项合并已忽略的 `apps/server/config.local.yaml`。本地文件可只填写需要覆盖的字段；文件不存在或字段缺失时沿用默认值，显式空字符串、`false` 和数值则是覆盖值。无效的本地配置会报错，不会静默退回默认配置。环境变量最后覆盖合并结果。
+
+部署文件也可保存在仓库外。显式使用 `ZHIYA_SERVER_CONFIG` 或 `-config` 时，只加载指定文件，不合并默认或本地文件。npm 命令的相对配置路径基于 `apps/server`；可执行文件的 `-config` 优先于环境变量，直接运行时路径基于当前工作目录。未指定配置的可执行文件从当前工作目录加载上述两个文件。`http.web_dir` 相对于默认或显式指定的配置文件解析。
 
 ```sh
 ZHIYA_SERVER_CONFIG=/absolute/path/config.yaml npm run check:server-config
