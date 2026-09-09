@@ -59,14 +59,16 @@ for (const lowPower of [false, true]) {
     ).digest("hex");
     let previous = await pixels();
     let changes = 0;
-    for (let frame = 0; frame < 100; frame++) {
+    for (let frame = 0; frame < 300; frame++) {
       await page.clock.runFor(10);
       const current = await pixels();
       if (current !== previous) changes++;
       previous = current;
     }
-    expect(changes).toBeGreaterThanOrEqual(20);
-    expect(changes).toBeLessThanOrEqual(lowPower ? 24 : 30);
+    // Sample three seconds to check sustained cadence. Browser frame scheduling
+    // can move one update across the sampling window's boundary.
+    expect(changes).toBeGreaterThanOrEqual(60);
+    expect(changes).toBeLessThanOrEqual((lowPower ? 24 : 30) * 3 + 1);
     await page.evaluate(() => {
       Object.defineProperty(document, "hidden", { configurable: true, value: true });
       document.dispatchEvent(new Event("visibilitychange"));

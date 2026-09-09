@@ -54,7 +54,7 @@ For younger students, use more images, concrete examples, and conversational gui
 
 ## Color and surfaces
 
-两套配色共用语义色彩。主题切换参考 [Cao Xin 的博客](https://www.caoxin.xyz/)，提供“自动 → 浅色 → 深色”的循环选择，而非三套独立配色。默认跟随系统，手动选择应在刷新后保留；只有自动模式响应系统外观变化。顶栏右侧使用轻量图标按钮，以半圆、太阳和月亮区分状态，并通过可访问名称说明当前状态与下一次点击的结果。
+两套配色共用语义色彩。主题切换参考 [Cao Xin 的博客](https://www.caoxin.xyz/)，提供“自动 → 浅色 → 深色”的循环选择，而非三套独立配色。默认跟随系统，手动选择应在刷新后保留；只有自动模式响应系统外观变化。登录页在顶栏右侧提供轻量图标按钮，登录后收进头像菜单的“外观”。以半圆、太阳和月亮区分状态，并通过可访问名称说明当前状态与下一次点击的结果；菜单关闭时仍响应系统外观变化。
 
 | Token | Sage light | Graphite dark | Purpose |
 | --- | --- | --- | --- |
@@ -108,8 +108,8 @@ Prioritize function and brevity in interface copy. State the task, result, or ne
 
 - Use the spacing scale 4, 8, 12, 16, 24, 32, 48, and 64. Keep explanations close to their objects and separate unrelated tasks.
 - Inspect desktop designs at 1440 × 1000 and mobile designs at 390 × 844, with an additional check at 320 wide. These are design samples, not commitments to particular operating systems.
-- Use a desktop content width of at most 1200 with side margins of at least 32. Use 20 on mobile, reducing to 16 on narrow screens.
-- Wide workspaces may use a 208-wide sidebar. Narrow screens use a top bar and bottom navigation. Focused lessons hide the persistent sidebar while retaining back navigation, the lesson title, contents, and practice access.
+- Fill the desktop window with the application shell; constrain reading content rather than the whole app. Onboarding uses a maximum reading width of 680 with 32-pixel side margins. Use 20 on mobile, reducing to 16 on narrow screens.
+- After onboarding, wide workspaces use a 224-wide sidebar that collapses to an 80-wide icon rail; narrow screens use a top bar and bottom navigation. Onboarding occupies the full window on every device, with all global navigation hidden until completion. Focused lessons retain back navigation, the lesson title, contents, and practice access.
 - Integrate the sidebar into the workspace canvas. Do not enclose it in a card, glass panel, rounded container, border, or shadow. Rounded highlighting belongs to the selected navigation item.
 - Recompose to one column when the content area falls below 720 wide. Never proportionally shrink the desktop artboard. Teaching examples may wrap; code and necessary data tables may scroll within their own regions.
 - Desktop lesson controls combine playback, speed, captions, pagination, and questions. Mobile separates playback and progress from the question input, accounting for safe areas and the software keyboard.
@@ -163,6 +163,12 @@ Make the question input the primary entry point in the classroom controls. Place
 Images serve learning. Keep aspect ratios and label positions consistent within a set. Classification labels must unambiguously correspond to their images. Missing images need an explanation and recovery state rather than an empty box. Use supplied assets or materials with clear provenance and usage conditions. Never substitute an image of the reference screen for editable interface content.
 
 ### 账号入口的构图与动效
+
+工作区沿用克制的动效语言：侧栏宽度平滑收放，页面与菜单轻柔出现，选中标记短促浮现。过渡约 160–240ms，不延迟提交或清空输入，不改变问答的字号与布局；首次建档与后续档案补充共用问答及思考状态。减少动态效果模式下直接切换状态。
+
+学习档案从头像菜单进入主面板，查看、发起修改、思考、逐题回答和保存结果均在主面板内完成，不使用档案弹窗，也不在生成结束后自动跳回编辑页。修改必须经过提问和回答，成功写入档案后才显示完成；普通生成文字不替代问题或保存结果。
+
+微调问答期间顶部提供“停止对话”退出图标，停止后结束本轮修改并返回档案，不提供暂停、继续或断点恢复。已保存档案保留，未完成的问题关闭，旧请求不得继续写入。重新进入时发起新一轮修改；首次建档仍保留进度恢复。图标按钮提供可访问名称和悬停提示，触控区域至少 44 × 44。
 
 登录、注册和找回密码页采用同一套入口视觉。顶栏的叶芽图标、知芽字标和主题按钮直接融入背景，不使用卡片背景、边框或阴影，也不附加宣传短句或背景播放按钮。桌面端将欢迎区与表单整体放在顶栏和页脚之间，使上下留白均衡；页脚位于短页面底部，长页面则随内容自然向下排列。手机端使用单列，优先保证表单完整可用。
 
@@ -218,10 +224,20 @@ Design artifacts use editable text and layouts, semantic colors, consistent typo
 
 Frontend implementation follows the project's React, TypeScript, Vite, and Tauri boundaries. These guidelines do not require another UI framework; use native semantics and existing components for behavior. Validate keyboard access, screen readers, zoom, and real devices during implementation. Figma inspection cannot substitute for runtime acceptance.
 
-## View the static design gallery
+## Application navigation and educational identity
 
-Open [demo.html](demo.html) in a browser, or serve the repository with `uv run --no-project python -m http.server 4173 --bind 127.0.0.1` and visit `http://127.0.0.1:4173/docs/design/demo.html`. Gallery links navigate between screen examples. Product controls illustrate appearance only; they do not submit answers, record audio, run experiments, or store student data.
+The running React application in `apps/client` is the visual reference. Use `npm run dev` with the documented local services to inspect actual behavior; do not maintain a parallel HTML/CSS gallery. Browser tests may use explicit API fixtures for unconnected services, but product screens must display real state.
 
-The gallery covers onboarding, the course map, narration, interrupted lessons, practice feedback, exploration, the lab, learning review, a graphite classroom, and recovery states. Resize the browser to inspect mobile layouts. Exported design images live in [screenshots/](screenshots/).
+- Desktop uses a full-height workspace with a 224-pixel sidebar, collapsible to an 80-pixel icon rail. Keep the navigation stable while the content scrolls. Main destinations use familiar SVG symbols for learning, exploration, experiments, and review. Expanded navigation uses short labels; collapsed navigation retains accessible names and hover titles.
+- Anchor the avatar menu at the bottom of the desktop sidebar and at the top right on phones. Group learning records used for personalization under “学习档案”, alongside profile, account security, appearance, and sign out. The avatar menu is the account entry point; avoid repeating these actions on the learning canvas.
+- Onboarding is a full-window experience on desktop and phone. Hide workspace navigation, the avatar menu, and other destinations until the saved completion state arrives, but always provide an accessible “退出建档” control, including during loading and thinking. Confirming exit signs out and returns to login; it never unlocks the workspace. Explain that submitted answers remain saved and unsent content is lost. Canceling or a failed sign-out keeps the current flow. A fresh session shows “欢迎来到知芽”, one short introduction, and “开始” before starting the model. Reloading an existing conversation resumes it without repeating the welcome. No fixed question count or new completion threshold is introduced.
+- Phone layouts use four bottom destinations after onboarding. Reserve safe-area space and keep the answer input reachable as the viewport resizes. After onboarding, opening the learning-profile dialog moves focus inside; Escape and its close button dismiss it and return focus to the avatar. Background learning state can continue to synchronize.
+- Submitting a learning-profile correction closes the editor and selects the learning destination after any unsaved-account-edit confirmation is accepted. Reuse the same question and thinking components as initial onboarding, including the large animated icon and small caption. Initial completion does not suppress an active correction or its follow-up questions. Keep the workspace navigation available. When the local correction finishes, reopen the latest profile; retain the correction draft and show an error inside the editor on failure. Change the selected destination only after navigation is accepted.
+- The onboarding questionnaire is a product-owned interface, not a stock chat input. Preserve its clear heading hierarchy, 16-pixel option text, separated rows, 24-pixel selection indicators, and glass answer surface. Underlying form and selection primitives may come from AI Elements or shadcn, without adopting their default visual layout. “自己填写” expands an inline input and replaces the preset selection. Text-only questions start with this option selected. “还不确定” is also a choice. All answers share one submit button; failed submissions preserve drafts and selections. Do not detach a composer at the bottom of the window; let longer questions scroll naturally.
+- Follow [Apple's material hierarchy](https://developer.apple.com/design/human-interface-guidelines/materials): use a softly tinted canvas, opaque reading surfaces, and translucent interaction layers. Apply glass materials to the questionnaire answer surface, account popover, profile shell, and mobile navigation. Keep text and icons opaque. These are cross-platform CSS materials inspired by Apple, not native Liquid Glass. Provide opaque fallbacks for unavailable blur and reduced transparency.
+- Product styles and interaction design remain locally owned, including AI experiences. Reuse [AI Elements](https://elements.ai-sdk.dev/) and shadcn capabilities selectively: icons, animations, accessibility primitives, input behavior, and content rendering. Import only what is used, preserve licenses, and adapt composition to the product rather than replacing whole pages with stock controls. Message Response, Reasoning, and Shimmer currently render AI output; never fabricate reasoning or show an empty disclosure. Respect reduced motion and retain Chinese input-method protection, Enter to submit, and Shift+Enter for a newline. Keep renderer concerns separate from Pi and server orchestration; concurrent agent output and distinct presentation/teaching surfaces must not be constrained to one library's chat layout. This design boundary does not imply those future capabilities are implemented.
+- Educational identity comes from recognizable book, compass, flask, and record symbols, a consistent sprout brand, and meaningful task states. Use soft green, blue, amber, and violet accents for subject illustrations while retaining the shared sage/graphite palette. Illustrations never imply completed work or mastery.
+- Show truthful empty states for unavailable courses, exploration, experiments, and learning records. Do not invent a course map, progress, or a functioning chat input before its associated capability exists.
+- Keep visible navigation labels short. Familiar actions such as sending, closing, returning, and collapsing can be icon-only, with accessible names. Explain privacy and record-editing consequences inside the relevant profile or confirmation surface, not in persistent learning-page paragraphs. Teaching questions and error recovery retain the words students need.
 
-The cat examples load imagery from the GitHub issue attachment and require a network connection. Exported screenshots and PDFs are excluded from version control. Verify imagery rights before release. Google Fonts supplies the declared Noto families; local serif and sans-serif fallbacks remain available when offline.
+Design references: [Codex task organization](https://openai.com/index/introducing-the-codex-app/), [Doubao Aixue's educational tasks](https://apps.apple.com/cn/app/id6469102455), [Duolingo's visual readability](https://blog.duolingo.com/shape-language-duolingos-art-style/), and [Duolingo's navigation consistency](https://blog.duolingo.com/core-tabs-redesign/). These inform composition and visual clarity, not feature commitments or copied assets.

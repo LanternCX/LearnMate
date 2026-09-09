@@ -29,13 +29,14 @@ type database interface {
 }
 
 type Models struct {
-	Users  UserModel
-	Tokens TokenModel
-	pool   *pgxpool.Pool
+	Learning LearningModel
+	Users    UserModel
+	Tokens   TokenModel
+	pool     *pgxpool.Pool
 }
 
 func NewModels(pool *pgxpool.Pool, policy config.Account) Models {
-	return Models{Users: UserModel{db: pool}, Tokens: TokenModel{db: pool, policy: policy}, pool: pool}
+	return Models{Learning: LearningModel{db: pool}, Users: UserModel{db: pool}, Tokens: TokenModel{db: pool, policy: policy}, pool: pool}
 }
 
 type TransactionMode bool
@@ -58,7 +59,7 @@ func (m Models) Transaction(ctx context.Context, mode TransactionMode, action fu
 			return err
 		}
 	}
-	err = action(Models{Users: UserModel{db: tx}, Tokens: TokenModel{db: tx, policy: m.Tokens.policy}})
+	err = action(Models{Learning: LearningModel{db: tx}, Users: UserModel{db: tx}, Tokens: TokenModel{db: tx, policy: m.Tokens.policy}})
 	var failedAttempt failedVerificationAttempt
 	if errors.As(err, &failedAttempt) {
 		// A rejected code must still consume an attempt. Verify before making other changes.

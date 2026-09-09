@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/LanternCX/zhiya/apps/server/internal/config"
 	"github.com/LanternCX/zhiya/apps/server/internal/data"
@@ -15,7 +16,12 @@ func (a *application) protect(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		if strings.HasPrefix(r.URL.Path, "/api/") {
-			ctx, cancel := context.WithTimeout(r.Context(), config.Seconds(a.config.Server.RequestTimeoutSeconds))
+			timeout := config.Seconds(a.config.Server.RequestTimeoutSeconds)
+			if r.URL.Path == "/api/learning/model" {
+				timeout = 120 * time.Second
+				_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(timeout))
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), timeout)
 			defer cancel()
 			r = r.WithContext(ctx)
 			if r.Method != "GET" {
@@ -37,7 +43,7 @@ func (a *application) protect(next http.Handler) http.Handler {
 					return
 				}
 			}
-			if strings.HasPrefix(r.URL.Path, "/api/auth/") || r.Method != "GET" {
+			if strings.HasPrefix(r.URL.Path, "/api/auth/") || (r.Method != "GET" && r.URL.Path != "/api/learning/sync") {
 				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 				if err := a.models.Tokens.Limit(r.Context(), "ip:"+ip, a.config.Account.IPLimit); err != nil {
 					a.respondError(w, err)

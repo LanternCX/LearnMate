@@ -1,3 +1,5 @@
+@layer theme, base, components, utilities;
+@layer base {
 :root {
   color-scheme: light;
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -307,6 +309,10 @@ input[aria-invalid="true"] { border-color: var(--error) !important; }
 .password-field.has-success input { padding-right: 88px !important; }
 .password-field input {
   padding-right: 56px !important;
+}
+/* The shared password field provides its own reveal button. */
+.password-field input::-ms-reveal {
+  display: none;
 }
 .password-toggle {
   position: absolute;
@@ -737,4 +743,5 @@ input:not([type="checkbox"]):not([type="file"]):focus {
     -webkit-backdrop-filter: none;
   }
   .confirmation::backdrop { backdrop-filter: none; }
+}
 }

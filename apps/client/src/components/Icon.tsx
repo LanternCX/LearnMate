@@ -1,0 +1,33 @@
+const paths = {
+  learning:
+    "M4 19V5c3-1 5-1 8 1 3-2 5-2 8-1v14c-3-1-5-1-8 1-3-2-5-2-8-1ZM12 6v14",
+  explore: "m16 8-3 5-5 3 3-5 5-3ZM12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z",
+  lab: "M9 3h6M10 3v7L4 19q-1 2 2 2h12q3 0 2-2l-6-9V3M7 15h10",
+  review: "M7 3h10v18H7a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3ZM8 8h5M8 12h5M8 16h3",
+  profile: "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM4 21v-2a8 8 0 0 1 16 0v2",
+  shield: "m12 2 8 3v6c0 5-4 8-8 11-4-3-8-6-8-11V5l8-3Zm-4 10 3 3 5-6",
+  logout: "M10 3H4v18h6M9 12h12m-4-4 4 4-4 4",
+  sidebar: "M3 4h18v16H3ZM9 4v16M5 8h2M5 12h2",
+  close: "m6 6 12 12M6 18 18 6",
+  send: "M12 20V4m-7 7 7-7 7 7",
+  check: "m5 12 4 4L19 6",
+  back: "M20 12H4m6-6-6 6 6 6",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+};
+export type IconName = keyof typeof paths;
+export default function Icon({ name }: { name: IconName }) {
+  return (
+    <svg
+      className="ui-icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={paths[name]} />
+    </svg>
+  );
+}

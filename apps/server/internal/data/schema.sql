@@ -34,3 +34,17 @@ CREATE TABLE IF NOT EXISTS auth_limits (
 ALTER TABLE sessions ALTER COLUMN expires_at DROP DEFAULT;
 ALTER TABLE challenges ALTER COLUMN expires_at DROP DEFAULT;
 ALTER TABLE users ALTER COLUMN nickname DROP DEFAULT;
+
+CREATE TABLE IF NOT EXISTS conversations (
+ id uuid PRIMARY KEY,
+ user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ purpose text NOT NULL,
+ state jsonb NOT NULL,
+ UNIQUE(user_id, purpose)
+);
+CREATE TABLE IF NOT EXISTS student_memories (
+ user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ content text NOT NULL DEFAULT '',
+ version integer NOT NULL DEFAULT 0,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);

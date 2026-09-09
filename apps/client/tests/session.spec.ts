@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { completedOnboarding } from "./completed-onboarding";
+
+test.beforeEach(async ({ page }) => { await completedOnboarding(page); });
 
 test("a session change dismisses a pending sign-out confirmation", async ({ page }) => {
   let signedIn = true;
@@ -12,6 +15,7 @@ test("a session change dismisses a pending sign-out confirmation", async ({ page
     return route.fulfill({ json: { ok: true } });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "退出登录", exact: true }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   signedIn = false;
@@ -76,8 +80,11 @@ test("canceling navigation preserves profile edits and returns focus", async ({
     }),
   );
   await page.goto("/");
+  await page.getByRole("button", { name: "用户菜单" }).click();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await page.getByLabel("昵称", { exact: true }).fill("未保存的昵称");
   const security = page.getByRole("button", { name: "账号安全", exact: true });
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await security.click();
   await page
     .getByRole("dialog")
@@ -86,12 +93,14 @@ test("canceling navigation preserves profile edits and returns focus", async ({
   await expect(page.getByLabel("昵称", { exact: true })).toHaveValue(
     "未保存的昵称",
   );
-  await expect(security).toBeFocused();
+  await expect(page.getByRole("button", { name: "用户菜单" })).toBeFocused();
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await security.click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "放弃修改", exact: true })
     .click();
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await expect(page.getByLabel("昵称", { exact: true })).toHaveValue("学习者");
 });

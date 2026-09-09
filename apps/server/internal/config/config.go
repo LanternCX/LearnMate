@@ -19,11 +19,17 @@ import (
 )
 
 type Config struct {
+	Model       Model    `yaml:"model"`
 	Development bool     `yaml:"development"`
 	Server      Server   `yaml:"http"`
 	Database    Database `yaml:"database"`
 	SMTP        SMTP     `yaml:"smtp"`
 	Account     Account  `yaml:"account"`
+}
+type Model struct {
+	Endpoint string `yaml:"endpoint"`
+	ID       string `yaml:"id"`
+	APIKey   string `yaml:"api_key"`
 }
 type Server struct {
 	Listen                   string `yaml:"listen"`
@@ -64,24 +70,49 @@ func Seconds(n int) time.Duration { return time.Duration(n) * time.Second }
 // Load applies ZHIYA_SERVER_SECTION_KEY environment variables over the selected file.
 // Empty environment values are overrides too, so optional credentials can be cleared.
 func Load(path string) (Config, error) {
-	var cfg Config
+	return loadFiles(path, "")
+}
+
+// LoadDefault overlays optional local fields before applying environment overrides.
+func LoadDefault(dir string) (Config, error) {
+	return loadFiles(filepath.Join(dir, "config.yaml"), filepath.Join(dir, "config.local.yaml"))
+}
+
+func decodeFile(path string, cfg *Config) error {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return cfg, fmt.Errorf("cannot read configuration file")
+		return err
 	}
 	decoder := yaml.NewDecoder(bytes.NewReader(raw))
 	decoder.KnownFields(true)
-	if err = decoder.Decode(&cfg); err != nil {
-		return cfg, fmt.Errorf("invalid configuration YAML: check field names and value types")
+	if err = decoder.Decode(cfg); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("invalid configuration YAML: check field names and value types")
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		return cfg, fmt.Errorf("configuration must contain one YAML document")
+		return fmt.Errorf("configuration must contain one YAML document")
 	}
-	// yaml.v3 otherwise truncates fractional scalars when decoding integer fields.
 	var document yaml.Node
 	if err = yaml.Unmarshal(raw, &document); err != nil || !validScalars(&document) {
-		return Config{}, fmt.Errorf("configuration does not accept fractional or null values; quote text values")
+		return fmt.Errorf("configuration does not accept fractional or null values; quote text values")
+	}
+	return nil
+}
+
+func loadFiles(path, local string) (Config, error) {
+	var cfg Config
+	err := decodeFile(path, &cfg)
+	if err != nil {
+		return Config{}, fmt.Errorf("cannot load default or selected configuration: %w", err)
+	}
+	if local != "" {
+		err = decodeFile(local, &cfg)
+		if err != nil && !os.IsNotExist(err) {
+			return Config{}, fmt.Errorf("cannot load local configuration: %w", err)
+		}
 	}
 	known := map[string]bool{"ZHIYA_SERVER_CONFIG": true}
 	if err = override(reflect.ValueOf(&cfg).Elem(), "ZHIYA_SERVER", known); err != nil {
@@ -162,6 +193,15 @@ func override(value reflect.Value, prefix string, known map[string]bool) error {
 }
 
 func (c Config) Validate() error {
+	if c.Model.Endpoint != "" {
+		u, err := url.Parse(c.Model.Endpoint)
+		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(c.Development && u.Scheme == "http" && loopback(u.Hostname()))) {
+			return fmt.Errorf("model.endpoint must be an HTTPS URL (loopback HTTP allowed in development)")
+		}
+		if c.Model.ID == "" {
+			return fmt.Errorf("model.id is required when model.endpoint is configured")
+		}
+	}
 	// All numeric settings are positive and bounded to avoid duration/size overflow.
 	if err := positive(reflect.ValueOf(c), ""); err != nil {
 		return err

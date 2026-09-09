@@ -77,6 +77,28 @@ Tauri 开发构建连接本地后端，登录凭证通过原生层保存在系�
 
 ## 配置与部署
 
+### 首次认识学生与模型连接
+
+学生登录后进入逐题引导，模型根据回答决定下一题、自主维护 Markdown 记忆，并通过 `complete_onboarding` 结束引导、进入学习首页。课程、自由探索和实验室入口尚未开放。账号资料与安全设置仍可独立访问。
+
+Pi 在客户端运行。模型和工具请求均经过 Go 后端；模型密钥只放在后端部署配置中。当前适配 OpenAI-compatible Chat Completions 流式接口，在服务端配置以下字段：
+
+| 字段／环境变量 | 用途 |
+| --- | --- |
+| `model.endpoint` / `ZHIYA_SERVER_MODEL_ENDPOINT` | 完整接口地址，包含 `/v1/chat/completions`；生产环境要求 HTTPS。 |
+| `model.id` / `ZHIYA_SERVER_MODEL_ID` | 服务支持的模型 ID。本次真实模型验证仅允许 `gpt-5.6-luna`，不自动替换模型。 |
+| `model.api_key` / `ZHIYA_SERVER_MODEL_API_KEY` | 服务端凭据，勿提交版本库。 |
+
+未配置模型时，账号服务照常运行，学习页显示暂时无法交流。模型请求最长 120 秒，输出上限为 8192 tokens；应用普通请求超时与之独立。自动化测试使用 mock 模型响应，不消耗真实模型额度，也不能代表真实模型的教学质量。
+
+会话使用 UUID 与 `purpose: onboarding` 标记。消息、工具结果、等待回答的问题和引导状态保存至 PostgreSQL，学生记忆单独保存。在线设备通过 HTTP 长轮询同步已保存状态（后端每 200ms 检查变化，每个请求最长等待 10 秒）；生成中的文字先在执行设备流式显示，完整回复保存后其他端可见。
+
+同一会话按轮串行执行。任一设备可回答当前问题，后端只接受一次；执行设备每 10 秒续约，通常 45 秒失联后可恢复，正在进行模型请求时最长等待其超时与执行租期。关闭客户端不会将 Agent 移到云端执行。恢复复用已完成工具结果，不额外提取画像。尚未同步的输入或生成片段可能丢失。
+
+“知芽记得的我”显示当前长期记忆，完成引导后可通过交流修改或清除。删除记忆不会删除聊天记录；首版没有单独删除会话的入口。注销账号会通过数据库关联删除会话和记忆。桌面请求继续使用系统安全存储中的登录凭据；现有 Android 安全存储限制仍适用。
+
+运行 `npm run test:accounts` 验证 HTTP 行为、隔离和恢复，运行 `npm run test:e2e -- onboarding.spec.ts` 验证真实客户端 Pi 配合 mock 模型的逐题、多端与记忆闭环。
+
 客户端和服务端的配置各自独立，连接地址在部署时对应起来。客户端构建不读取后端文件，也不运行 Go 配置校验。
 
 ### 客户端：开发／构建时配置
@@ -112,7 +134,9 @@ npm run build
 
 所有 `_seconds` 字段使用秒。环境变量按 `ZHIYA_SERVER_<SECTION>_<KEY>` 覆盖文件，例如 `ZHIYA_SERVER_HTTP_LISTEN`、`ZHIYA_SERVER_DATABASE_URL`、`ZHIYA_SERVER_SMTP_PASSWORD`；顶层开发标志为 `ZHIYA_SERVER_DEVELOPMENT`。空字符串也是覆盖值。
 
-部署文件可保存在仓库外，或使用已忽略的 `apps/server/config.local.yaml`。npm 命令通过 `ZHIYA_SERVER_CONFIG` 选择，相对路径基于 `apps/server`。可执行文件的 `-config` 优先于该环境变量；直接运行时，相对配置路径基于当前工作目录。`http.web_dir` 始终相对于所选 YAML 文件解析。
+默认运行 `npm run dev:server` 时，先加载 `apps/server/config.yaml`，再逐项合并已忽略的 `apps/server/config.local.yaml`。本地文件可只填写需要覆盖的字段；文件不存在或字段缺失时沿用默认值，显式空字符串、`false` 和数值则是覆盖值。无效的本地配置会报错，不会静默退回默认配置。环境变量最后覆盖合并结果。
+
+部署文件也可保存在仓库外。显式使用 `ZHIYA_SERVER_CONFIG` 或 `-config` 时，只加载指定文件，不合并默认或本地文件。npm 命令的相对配置路径基于 `apps/server`；可执行文件的 `-config` 优先于环境变量，直接运行时路径基于当前工作目录。未指定配置的可执行文件从当前工作目录加载上述两个文件。`http.web_dir` 相对于默认或显式指定的配置文件解析。
 
 ```sh
 ZHIYA_SERVER_CONFIG=/absolute/path/config.yaml npm run check:server-config

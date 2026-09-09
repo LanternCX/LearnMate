@@ -1,0 +1,417 @@
+.ui-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.icon-button:hover {
+  background: var(--subtle);
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  height: 100dvh;
+  background: var(--canvas-fill);
+}
+.workspace-sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 24px 16px 16px;
+  background: transparent;
+}
+.workspace-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  height: 44px;
+  font-size: 22px;
+  font-weight: 650;
+}
+.workspace-brand svg {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.workspace-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 48px;
+}
+.workspace-nav button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.workspace-nav button:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.workspace-nav button[aria-current] {
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  font-weight: 650;
+}
+.workspace-account {
+  position: relative;
+  margin-top: auto;
+  padding-top: 24px;
+}
+.user-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: var(--text);
+  padding: 8px;
+}
+.user-trigger:hover {
+  background: var(--surface);
+}
+.user-avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  overflow: hidden;
+}
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.user-avatar .ui-icon {
+  width: 20px;
+  height: 20px;
+}
+.user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  font-size: 14px;
+}
+.user-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 232px;
+  z-index: 20;
+  padding: 8px;
+  border: 1px solid var(--glass-edge);
+  border-radius: 16px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(24px) saturate(125%);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+}
+.user-popover > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+.user-popover > button:hover {
+  background: var(--subtle);
+}
+.appearance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: 12px;
+  margin: 6px 0;
+  border-block: 1px solid var(--line);
+  font-size: 15px;
+}
+.appearance-row .theme-toggle {
+  width: 44px;
+  min-height: 44px;
+}
+.appearance-row .theme-toggle svg {
+  width: 22px;
+  height: 22px;
+}
+.workspace-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.workspace-toolbar {
+  height: 76px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 40px 24px;
+  overscroll-behavior: contain;
+}
+.workspace-settings {
+  max-width: 680px;
+  margin: 40px auto;
+  padding: 28px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--paper-shadow);
+}
+.workspace-settings h1 {
+  font-size: 28px;
+  margin-bottom: 32px;
+}
+.workspace-empty {
+  display: flex;
+  min-height: 65dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+}
+.workspace-empty h1 {
+  font-size: 26px;
+  margin: 20px 0 0;
+}
+.workspace-empty p {
+  color: var(--muted);
+  font-size: 15px;
+}
+.subject-art {
+  display: grid;
+  place-items: center;
+  width: 112px;
+  height: 112px;
+  border-radius: 36px 48px 32px 44px;
+  background: #e4efde;
+  color: #456b3b;
+  transform: rotate(-5deg);
+}
+.subject-art .ui-icon {
+  width: 56px;
+  height: 56px;
+  transform: rotate(5deg);
+  stroke-width: 1.4;
+}
+.subject-art.explore {
+  background: #dfedf6;
+  color: #346182;
+}
+.subject-art.lab {
+  background: #f6ead0;
+  color: #806122;
+}
+.subject-art.review {
+  background: #eae4f2;
+  color: #665382;
+}
+.is-collapsed {
+  grid-template-columns: 80px minmax(0, 1fr);
+}
+.is-collapsed .workspace-sidebar {
+  padding-inline: 12px;
+}
+.is-collapsed .workspace-brand {
+  padding: 0 10px;
+}
+.is-collapsed .workspace-brand span,
+.is-collapsed .workspace-nav span,
+.is-collapsed .user-name,
+.is-collapsed .user-trigger > .ui-icon {
+  display: none;
+}
+.is-collapsed .user-trigger {
+  justify-content: center;
+}
+@media (max-width: 720px) {
+  .workspace,
+  .workspace.is-collapsed {
+    display: flex;
+    flex-direction: column;
+  }
+  .workspace-sidebar {
+    position: static;
+    display: contents;
+  }
+  .workspace-brand {
+    display: none;
+  }
+  .workspace-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 0;
+    margin: 0;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--glass);
+    backdrop-filter: blur(24px) saturate(125%);
+    -webkit-backdrop-filter: blur(24px) saturate(125%);
+  }
+  .workspace-nav button {
+    flex-direction: column;
+    gap: 4px;
+    min-width: 60px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .is-collapsed .workspace-nav span {
+    display: inline;
+  }
+  .workspace-account {
+    position: absolute;
+    top: max(8px, env(safe-area-inset-top));
+    right: 12px;
+    padding: 0;
+    z-index: 30;
+  }
+  .user-trigger {
+    width: 44px;
+    height: 44px;
+    padding: 4px;
+  }
+  .user-name,
+  .user-trigger > .ui-icon {
+    display: none;
+  }
+  .user-popover {
+    top: calc(100% + 8px);
+    bottom: auto;
+    left: auto;
+    right: 0;
+    max-height: calc(100dvh - 100px);
+    overflow-y: auto;
+  }
+  .workspace-body {
+    height: 100%;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
+  }
+  .workspace-toolbar {
+    height: calc(60px + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 64px 0 20px;
+  }
+  .sidebar-toggle {
+    display: none;
+  }
+  .workspace-content {
+    padding: 0 20px 16px;
+  }
+  .is-onboarding .workspace-nav {
+    display: none;
+  }
+  .is-onboarding .workspace-body {
+    padding-bottom: 0;
+  }
+  .workspace-settings {
+    margin: 24px auto;
+  }
+  .workspace-empty {
+    min-height: 60dvh;
+  }
+}
+
+.workspace [hidden] {
+  display: none !important;
+}
+.workspace.is-onboarding {
+  grid-template-columns: minmax(0, 1fr);
+}
+.onboarding-controls {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+.onboarding-controls .icon-button {
+  color: var(--muted);
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  border-radius: 50%;
+}
+.is-onboarding .workspace-content {
+  padding: max(24px, env(safe-area-inset-top)) 32px
+    max(24px, env(safe-area-inset-bottom));
+}
+.is-onboarding .learning-surface {
+  max-width: 680px;
+}
+.is-onboarding .question-card {
+  min-height: 0;
+  padding-top: clamp(24px, 5vh, 56px);
+}
+.is-onboarding .learning-progress {
+  min-height: calc(100dvh - 48px);
+}
+.is-onboarding .learning-loading {
+  min-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+.is-onboarding .learning-progress > p {
+  max-width: 36em;
+  color: var(--text);
+}
+@media (max-width: 720px) {
+  .is-onboarding .workspace-content {
+    padding: max(20px, env(safe-area-inset-top)) 20px
+      max(16px, env(safe-area-inset-bottom));
+  }
+  .is-onboarding .question-card {
+    min-height: 0;
+    padding-top: 24px;
+  }
+  .workspace-settings {
+    padding: 20px;
+  }
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .user-popover,
+  .workspace-nav {
+    background: var(--surface);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .user-popover,
+  .workspace-nav {
+    background: var(--surface);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

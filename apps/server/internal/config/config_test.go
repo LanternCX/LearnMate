@@ -9,6 +9,49 @@ import (
 	"github.com/LanternCX/zhiya/apps/server/internal/config"
 )
 
+func TestDefaultConfigurationLayersLocalFields(t *testing.T) {
+	raw, err := os.ReadFile("../../config.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), raw, 0600); err != nil {
+		t.Fatal(err)
+	}
+	base, err := config.LoadDefault(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	local := filepath.Join(dir, "config.local.yaml")
+	if err := os.WriteFile(local, []byte("http:\n  listen: 127.0.0.1:18081\nmodel:\n  id: gpt-5.6-luna\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.LoadDefault(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Server.Listen != "127.0.0.1:18081" || cfg.Model.ID != "gpt-5.6-luna" || cfg.Server.Origin != base.Server.Origin || cfg.Database.URL != base.Database.URL {
+		t.Fatal("local fields must override while absent fields retain defaults")
+	}
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "")
+	cfg, err = config.LoadDefault(dir)
+	if err != nil || cfg.Model.ID != "" {
+		t.Fatal("environment must override local values, including empty values")
+	}
+	explicit, err := config.Load(filepath.Join(dir, "config.yaml"))
+	if err != nil || explicit.Server.Listen != base.Server.Listen {
+		t.Fatal("explicit configuration must not load a local overlay")
+	}
+	for _, content := range []string{"http:\n  listen: null\n", "http:\n  typo: secret-value\n", "http:\n  read_timeout_seconds: 0\n"} {
+		if err := os.WriteFile(local, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := config.LoadDefault(dir); err == nil || strings.Contains(err.Error(), "secret-value") {
+			t.Fatal("invalid local configuration must fail without exposing values")
+		}
+	}
+}
+
 func TestEnvironmentOverridesFileAndPathsBelongToConfigDirectory(t *testing.T) {
 	raw, err := os.ReadFile("../../config.yaml")
 	if err != nil {
