@@ -310,6 +310,10 @@ input[aria-invalid="true"] { border-color: var(--error) !important; }
 .password-field input {
   padding-right: 56px !important;
 }
+/* The shared password field provides its own reveal button. */
+.password-field input::-ms-reveal {
+  display: none;
+}
 .password-toggle {
   position: absolute;
   right: 5px;

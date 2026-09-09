@@ -3,6 +3,52 @@ import { completedOnboarding } from "./completed-onboarding";
 
 test.beforeEach(async ({ page }) => { await completedOnboarding(page); });
 
+test("password fields use one reveal control and preserve the value when toggled", async ({ page }) => {
+  await page.route("**/api/me", route => route.fulfill({ status: 401, json: { error: "请登录" } }));
+  await page.route("**/api/auth/register/start", route => route.fulfill({ json: { flow: "registration" } }));
+  await page.goto("/");
+
+  async function checkPassword(label: string) {
+    const input = page.getByLabel(label, { exact: true });
+    // Typing while focused makes Edge's native reveal control appear.
+    await input.pressSequentially("my-password");
+    await expect(input).toHaveAttribute("type", "password");
+    if (await page.evaluate(() => CSS.supports("selector(input::-ms-reveal)"))) {
+      // Native controls live in the browser's closed shadow DOM.
+      const session = await page.context().newCDPSession(page);
+      try {
+        await session.send("DOM.enable");
+        await session.send("CSS.enable");
+        const { nodes } = await session.send("DOM.getFlattenedDocument", { depth: -1, pierce: true });
+        const reveals = nodes.filter(node => node.attributes?.includes("-ms-reveal"));
+        expect(reveals.length).toBeGreaterThan(0);
+        for (const { nodeId } of reveals) {
+          const { computedStyle } = await session.send("CSS.getComputedStyleForNode", { nodeId });
+          expect(computedStyle.find(property => property.name === "display")?.value).toBe("none");
+        }
+      } finally {
+        await session.detach();
+      }
+    }
+    const show = page.getByRole("button", { name: `显示${label}`, exact: true });
+    await expect(show).toHaveCount(1);
+    await show.click();
+    await expect(input).toHaveAttribute("type", "text");
+    await expect(input).toHaveValue("my-password");
+    await page.getByRole("button", { name: `隐藏${label}`, exact: true }).click();
+    await expect(input).toHaveAttribute("type", "password");
+    await expect(input).toHaveValue("my-password");
+  }
+
+  await checkPassword("密码");
+  await page.getByRole("button", { name: "注册账号", exact: true }).click();
+  await page.getByLabel("邮箱", { exact: true }).fill("learner@example.com");
+  await page.getByRole("button", { name: "发送验证码", exact: true }).click();
+  await checkPassword("密码");
+  await checkPassword("确认密码");
+  await expect(page.getByRole("img", { name: "两次输入一致" })).toBeVisible();
+});
+
 test("verification can expire and be resent without losing the chosen password", async ({ page }) => {
   await page.clock.install();
   await page.route("**/api/me", route => route.fulfill({ status: 401, json: { error: "请登录" } }));
