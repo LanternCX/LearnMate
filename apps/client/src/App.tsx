@@ -4,12 +4,10 @@ import AmbientBackground from "./components/AmbientBackground";
 import Mark from "./components/Mark";
 import Confirmation from "./components/Confirmation";
 import AuthForms from "./account/AuthForms";
-import Profile from "./account/Profile";
-import Security from "./account/Security";
 import { useAccount } from "./account/useAccount";
 import type { View } from "./account/types";
 import { PolicyContext } from "./account/Policy";
-import Learning from "./learning/Learning";
+import Workspace from "./Workspace";
 
 export default function App() {
   const account = useAccount();
@@ -25,7 +23,6 @@ export default function App() {
     confirmation,
     load,
     navigate,
-    logout,
     answerConfirmation,
   } = account;
   const heading = useRef<HTMLHeadingElement>(null);
@@ -69,6 +66,16 @@ export default function App() {
     </>
   );
 
+  if (user && !loading && !offline)
+    return (
+      <PolicyContext.Provider value={account.policy}>
+        <Workspace key={user.id} account={account} feedback={feedback} />
+        {confirmation && (
+          <Confirmation {...confirmation} answer={answerConfirmation} />
+        )}
+      </PolicyContext.Provider>
+    );
+
   return (
     <PolicyContext.Provider value={account.policy}>
       <div className={`app ${user ? "signed-in" : "signed-out"}`}>
@@ -98,40 +105,6 @@ export default function App() {
           </main>
         ) : (
           <>
-            {user && (
-              <aside className="sidebar">
-                <p className="eyebrow">知芽 · 学习空间</p>
-                <nav aria-label="账号设置">
-                  <button
-                    aria-current={view === "home" ? "page" : undefined}
-                    onClick={() => navigate("home")}
-                  >
-                    学习空间
-                  </button>
-                  <button
-                    aria-current={view === "profile" ? "page" : undefined}
-                    onClick={() => navigate("profile")}
-                  >
-                    个人资料
-                  </button>
-                  <button
-                    aria-current={
-                      view !== "profile" && view !== "home" ? "page" : undefined
-                    }
-                    onClick={() => navigate("security")}
-                  >
-                    账号安全
-                  </button>
-                </nav>
-                <button
-                  className="text-button sidebar-logout"
-                  disabled={busy}
-                  onClick={() => void logout(false)}
-                >
-                  退出登录
-                </button>
-              </aside>
-            )}
             {!user && (
               <aside className="welcome" aria-label="欢迎">
                 <h2>
@@ -171,15 +144,7 @@ export default function App() {
                 className="view-content"
                 key={`${view}:${user?.id ?? "guest"}:${flow?.email ?? "start"}`}
               >
-                {!user ? (
-                  <AuthForms {...account} />
-                ) : view === "home" ? (
-                  <Learning key={user.id} user={user} />
-                ) : view === "profile" ? (
-                  <Profile {...account} user={user} />
-                ) : (
-                  <Security {...account} user={user} />
-                )}
+                <AuthForms {...account} />
               </div>
               {busy && (
                 <p className="visually-hidden" role="status">

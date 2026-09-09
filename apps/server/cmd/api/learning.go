@@ -12,11 +12,13 @@ import (
 )
 
 type learningAction struct {
-	Action     string          `json:"action"`
-	RunID      string          `json:"runId"`
-	Message    json.RawMessage `json:"message"`
-	ToolCallID string          `json:"toolCallId"`
-	Answer     *studentAnswer  `json:"answer"`
+	Action         string          `json:"action"`
+	RunID          string          `json:"runId"`
+	Message        json.RawMessage `json:"message"`
+	ToolCallID     string          `json:"toolCallId"`
+	Answer         *studentAnswer  `json:"answer"`
+	CorrectionText string          `json:"correctionText"`
+	Revision       *int            `json:"revision"`
 }
 type studentAnswer struct {
 	Selected []string `json:"selected"`
@@ -95,8 +97,23 @@ func (a *application) learningAction(w http.ResponseWriter, r *http.Request) {
 		}
 		switch input.Action {
 		case "claim":
+			if input.CorrectionText != "" {
+				if !state.Completed || input.Revision == nil || *input.Revision != state.Revision || state.Question != nil || firstPendingCall(&state) != "" {
+					return failure{409, "会话已变化，请重新发起修改"}
+				}
+				if strings.TrimSpace(input.CorrectionText) == "" || len(input.CorrectionText) > 16000 {
+					return bad("请简要说明修改内容")
+				}
+			} else if state.CorrectionEnded {
+				return failure{409, "本次修改已结束，请重新发起修改"}
+			}
 			if state.RunID != "" && time.Now().Before(state.LeaseUntil) {
 				return failure{409, "正在处理中，请稍候"}
+			}
+			if input.CorrectionText != "" {
+				state.CorrectionEnded = false
+				message, _ := json.Marshal(map[string]any{"role": "user", "content": []any{map[string]string{"type": "text", "text": input.CorrectionText}}, "timestamp": time.Now().UnixMilli()})
+				state.Messages = append(state.Messages, message)
 			}
 			state.RunID = data.UUID()
 			state.Inference = false
@@ -107,6 +124,20 @@ func (a *application) learningAction(w http.ResponseWriter, r *http.Request) {
 				state.Status = "running"
 			}
 			output = map[string]string{"runId": state.RunID}
+		case "end_correction":
+			if !state.Completed {
+				return failure{409, "首次建档请保留进度后退出"}
+			}
+			for id := firstPendingCall(&state); id != ""; id = firstPendingCall(&state) {
+				call := findCall(&state, id)
+				appendToolResult(&state, id, call.Name, map[string]string{"error": "The student ended this correction. Do not resume it."}, true)
+			}
+			state.Question = nil
+			state.RunID = ""
+			state.Inference = false
+			state.LeaseUntil = time.Time{}
+			state.Status = "idle"
+			state.CorrectionEnded = true
 		case "answer":
 			if state.Question == nil || input.ToolCallID != state.Question.ID {
 				return failure{409, "这道问题已更新，请查看最新内容"}

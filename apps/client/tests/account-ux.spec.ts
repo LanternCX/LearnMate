@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { completedOnboarding } from "./completed-onboarding";
+
+test.beforeEach(async ({ page }) => { await completedOnboarding(page); });
 
 test("verification can expire and be resent without losing the chosen password", async ({ page }) => {
   await page.clock.install();
@@ -48,6 +51,7 @@ test("sign out requires confirmation, supports Escape, and preserves edits on ca
   });
   await page.goto("/");
   const logout = page.getByRole("button", { name: "退出登录", exact: true });
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await logout.click();
   const dialog = page.getByRole("dialog", { name: "退出登录？" });
   await expect(dialog).toBeVisible();
@@ -58,14 +62,17 @@ test("sign out requires confirmation, supports Escape, and preserves edits on ca
   await expect(dialog.getByRole("button", { name: "取消", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
-  await expect(logout).toBeFocused();
+  await expect(page.getByRole("button", { name: "用户菜单" })).toBeFocused();
   expect(exits).toBe(0);
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "个人资料", exact: true }).click();
   await page.getByLabel("昵称", { exact: true }).fill("未保存");
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await logout.click();
   await expect(dialog).toContainText("尚未保存");
   await dialog.getByRole("button", { name: "取消", exact: true }).click();
   await expect(page.getByLabel("昵称", { exact: true })).toHaveValue("未保存");
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await logout.click();
   await dialog.getByRole("button", { name: "退出登录", exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -84,6 +91,7 @@ test("permanent deletion waits for final confirmation and cancellation is harmle
     return route.fulfill({ json: { id: "learner", email: "learner@example.com", nickname: "学习者", avatar: "" } });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "账号安全", exact: true }).click();
   await page.getByRole("button", { name: "注销账号", exact: true }).click();
   await expect(page.getByRole("heading", { name: "注销后无法恢复" })).not.toBeVisible();

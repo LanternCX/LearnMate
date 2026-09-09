@@ -72,6 +72,32 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	defer finish()
+	// Observe persisted ownership so stopping works across devices and server instances.
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	go func() {
+		ticker := time.NewTicker(200 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				owned := false
+				err := a.models.Transaction(ctx, data.StandardTransaction, func(m data.Models) error {
+					c, err := m.Learning.Load(ctx, user)
+					if err == nil {
+						owned = c.RunID == input.RunID
+					}
+					return err
+				})
+				if err != nil || !owned {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 	if input.Payload == nil {
 		a.respondError(w, bad("模型请求无效"))
 		return
@@ -82,7 +108,7 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 	delete(input.Payload, "max_tokens")
 	input.Payload["max_completion_tokens"] = 8192
 	raw, _ := json.Marshal(input.Payload)
-	upstream, err := http.NewRequestWithContext(r.Context(), "POST", a.config.Model.Endpoint, bytes.NewReader(raw))
+	upstream, err := http.NewRequestWithContext(ctx, "POST", a.config.Model.Endpoint, bytes.NewReader(raw))
 	if err != nil {
 		a.respondError(w, failure{502, "暂时无法连接模型服务"})
 		return

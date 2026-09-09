@@ -150,7 +150,7 @@ export function useAccount() {
     return me;
   }
   async function navigate(next: View) {
-    if (busy) return;
+    if (busy) return false;
     const generation = epoch.current;
     if (
       view === "profile" &&
@@ -162,20 +162,21 @@ export function useAccount() {
         confirmLabel: "放弃修改",
       }))
     )
-      return;
-    if (generation !== epoch.current) return;
+      return false;
+    if (generation !== epoch.current) return false;
     setView(next);
     setFlow(null);
     setError("");
     setNotice("");
     setAvatarDraft(null);
     if (user) setNickname(user.nickname);
+    return true;
   }
-  async function logout(all: boolean) {
+  async function logout(all: boolean, context?: "onboarding") {
     const unsaved = view === "profile" && user && (nickname !== user.nickname || avatarDraft !== null);
     await runConfirmed({
       title: all ? "退出全部设备？" : "退出登录？",
-      text: (all ? "当前及其他设备都会退出，需要重新登录才能继续使用。" : "当前设备将退出，需要重新登录才能继续使用。")
+      text: context === "onboarding" ? "退出后返回登录页。已提交的回答会保留，当前未提交的内容将丢失。" : (all ? "当前及其他设备都会退出，需要重新登录才能继续使用。" : "当前设备将退出，需要重新登录才能继续使用。")
         + (unsaved ? "资料尚未保存，退出后这些修改将丢失。" : "已保存的资料会保留。"),
       confirmLabel: all ? "退出全部设备" : "退出登录",
     }, async () => {

@@ -1,0 +1,292 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { useAccount } from "./account/useAccount";
+import Profile from "./account/Profile";
+import Security from "./account/Security";
+import Learning from "./learning/Learning";
+import Mark from "./components/Mark";
+import Icon, { type IconName } from "./components/Icon";
+import ThemeToggle from "./components/ThemeToggle";
+import "./workspace.css";
+
+const destinations: {
+  id: IconName;
+  label: string;
+  title: string;
+  empty: string;
+}[] = [
+  { id: "learning", label: "学习", title: "学习地图", empty: "课程准备中" },
+  { id: "explore", label: "探索", title: "自由探索", empty: "探索即将开放" },
+  { id: "lab", label: "实验", title: "AI 实验室", empty: "实验准备中" },
+  { id: "review", label: "回顾", title: "学习回顾", empty: "还没有学习记录" },
+];
+
+export default function Workspace({
+  account,
+  feedback,
+}: {
+  account: ReturnType<typeof useAccount>;
+  feedback: ReactNode;
+}) {
+  const { user, view, navigate, busy, logout } = account;
+  const [collapsed, setCollapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [memoryOpen, setMemoryOpen] = useState(false);
+  const [editingMemory, setEditingMemory] = useState(true);
+  const [endingMemory, setEndingMemory] = useState(false);
+  const [onboarding, setOnboarding] = useState(true);
+  const [destination, setDestination] = useState(destinations[0]);
+  const menu = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const onboardingExit = useRef<HTMLButtonElement>(null);
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (wasConfirming.current && !account.confirmation)
+      (onboarding ? onboardingExit : trigger).current?.focus();
+    wasConfirming.current = Boolean(account.confirmation);
+  }, [account.confirmation, onboarding]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    menu.current?.querySelector("button")?.focus();
+    const dismiss = (e: PointerEvent) => {
+      if (
+        !menu.current?.contains(e.target as Node) &&
+        !trigger.current?.contains(e.target as Node)
+      )
+        setMenuOpen(false);
+    };
+    const escape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMenuOpen(false);
+        trigger.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [menuOpen]);
+  if (!user) return null;
+  const titles: Record<string, string> = {
+    profile: "个人资料",
+    security: "账号安全",
+    password: "修改密码",
+    email: "更换邮箱",
+    delete: "注销账号",
+  };
+  const go = async (next: typeof destination) => {
+    if (await navigate("home")) {
+      setMemoryOpen(false);
+      setDestination(next);
+    }
+  };
+  return (
+    <div
+      className={`workspace ${collapsed ? "is-collapsed" : ""} ${onboarding ? "is-onboarding" : ""}`}
+    >
+      <aside
+        hidden={onboarding}
+        className="workspace-sidebar"
+        aria-label="侧栏"
+      >
+        <div className="workspace-brand">
+          <Mark />
+          <span>知芽</span>
+        </div>
+        <nav className="workspace-nav" aria-label="主导航">
+          {destinations.map((item) => (
+            <button
+              key={item.id}
+              title={item.title}
+              aria-label={item.title}
+              aria-current={
+                view === "home" && !memoryOpen && destination.id === item.id
+                  ? "page"
+                  : undefined
+              }
+              onClick={() => go(item)}
+            >
+              <Icon name={item.id} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="workspace-account">
+          <button
+            ref={trigger}
+            className="user-trigger"
+            aria-label="用户菜单"
+            aria-expanded={menuOpen}
+            aria-controls="user-menu"
+            onClick={() => setMenuOpen(!menuOpen)}
+          >
+            <span className="user-avatar">
+              {user.avatar ? (
+                <img src={user.avatar} alt="" />
+              ) : (
+                <Icon name="profile" />
+              )}
+            </span>
+            <span className="user-name">{user.nickname}</span>
+            <Icon name="more" />
+          </button>
+          <div
+            ref={menu}
+            hidden={!menuOpen}
+            id="user-menu"
+            className="user-popover"
+            aria-label="用户设置"
+          >
+            <button
+              onClick={async () => {
+                setMenuOpen(false);
+                if (await navigate("home")) setMemoryOpen(true);
+              }}
+            >
+              <Icon name="review" />
+              学习档案
+            </button>
+            <button
+              onClick={async () => {
+                setMenuOpen(false);
+                if (await navigate("profile")) setMemoryOpen(false);
+              }}
+            >
+              <Icon name="profile" />
+              个人资料
+            </button>
+            <button
+              onClick={async () => {
+                setMenuOpen(false);
+                if (await navigate("security")) setMemoryOpen(false);
+              }}
+            >
+              <Icon name="shield" />
+              账号安全
+            </button>
+            <div className="appearance-row">
+              <span>外观</span>
+              <ThemeToggle />
+            </div>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setMenuOpen(false);
+                void logout(false);
+              }}
+            >
+              <Icon name="logout" />
+              退出登录
+            </button>
+          </div>
+        </div>
+      </aside>
+      <div className="workspace-body">
+        <header hidden={onboarding} className="workspace-toolbar">
+          <button
+            className="icon-button sidebar-toggle"
+            aria-label={collapsed ? "展开侧栏" : "收起侧栏"}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed(!collapsed)}
+          >
+            <Icon name="sidebar" />
+          </button>
+          {(view !== "home" || memoryOpen) && (
+            <button
+              className="icon-button"
+              aria-label={
+                memoryOpen && !editingMemory ? "停止对话" : "返回学习"
+              }
+              title={memoryOpen && !editingMemory ? "停止对话" : "返回学习"}
+              disabled={endingMemory}
+              onClick={() =>
+                memoryOpen && !editingMemory
+                  ? setEndingMemory(true)
+                  : go(destinations[0])
+              }
+            >
+              <Icon name={memoryOpen && !editingMemory ? "close" : "back"} />
+            </button>
+          )}
+          <span>
+            {memoryOpen
+              ? "学习档案"
+              : view === "home"
+                ? onboarding && destination.id === "learning"
+                  ? "初次见面"
+                  : destination.title
+                : titles[view]}
+          </span>
+        </header>
+        <main className="workspace-content" aria-busy={busy}>
+          {onboarding && (
+            <div className="onboarding-controls">
+              <button
+                ref={onboardingExit}
+                className="icon-button"
+                aria-label="退出建档"
+                title="退出建档"
+                disabled={busy}
+                onClick={() => void logout(false, "onboarding")}
+              >
+                <Icon name="close" />
+              </button>
+            </div>
+          )}
+          {feedback}
+          <Learning
+            user={user}
+            visible={
+              onboarding ||
+              (view === "home" && (memoryOpen || destination.id === "learning"))
+            }
+            memoryOpen={!onboarding && memoryOpen}
+            editing={editingMemory}
+            setEditing={setEditingMemory}
+            ending={endingMemory}
+            setEnding={setEndingMemory}
+            onOnboardingChange={setOnboarding}
+          />
+          {!onboarding &&
+            !memoryOpen &&
+            view === "home" &&
+            destination.id !== "learning" && (
+              <section key={destination.id} className="workspace-empty">
+                <div className={`subject-art ${destination.id}`}>
+                  <Icon name={destination.id} />
+                </div>
+                <h1>{destination.empty}</h1>
+                <button
+                  className="text-button"
+                  onClick={() => go(destinations[0])}
+                >
+                  返回学习
+                </button>
+              </section>
+            )}
+          {!onboarding && view !== "home" && (
+            <section key={view} className="workspace-settings">
+              <h1>{titles[view]}</h1>
+              {view === "profile" ? (
+                <Profile {...account} user={user} />
+              ) : (
+                <>
+                  <Security {...account} user={user} />
+                  {view !== "security" && (
+                    <button
+                      className="text-button"
+                      onClick={() => navigate("security")}
+                    >
+                      返回账号安全
+                    </button>
+                  )}
+                </>
+              )}
+            </section>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}

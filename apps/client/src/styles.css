@@ -1,3 +1,5 @@
+@layer theme, base, components, utilities;
+@layer base {
 :root {
   color-scheme: light;
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -737,4 +739,5 @@ input:not([type="checkbox"]):not([type="file"]):focus {
     -webkit-backdrop-filter: none;
   }
   .confirmation::backdrop { backdrop-filter: none; }
+}
 }

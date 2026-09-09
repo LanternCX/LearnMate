@@ -1,0 +1,251 @@
+import { expect, test } from "@playwright/test";
+
+for (const stage of ["welcome", "question"] as const) {
+  test(`onboarding ${stage} can be canceled or exited to login, never to the workspace`, async ({
+    page,
+  }) => {
+    await page.route("**/api/me", (route) =>
+      route.fulfill({
+        json: {
+          id: "student",
+          nickname: "小芽",
+          email: "student@example.com",
+          avatar: "",
+        },
+      }),
+    );
+    const state = {
+      id: "session",
+      purpose: "onboarding",
+      messages: [],
+      completed: false,
+      memory: "",
+      memoryVersion: 0,
+      revision: 0,
+      status: stage === "welcome" ? "idle" : "waiting",
+      leaseUntil: "",
+      question:
+        stage === "welcome"
+          ? null
+          : {
+              id: "q",
+              text: "你想先学什么？",
+              kind: "single",
+              options: ["编程", "AI"],
+            },
+    };
+    await page.route("**/api/learning", (route) =>
+      route.fulfill({ json: state }),
+    );
+    await page.route("**/api/learning/model", (route) =>
+      route.fulfill({ json: { available: false } }),
+    );
+    await page.route("**/api/learning/sync", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await route.fulfill({ json: state });
+    });
+    let failLogout = true;
+    await page.route("**/api/auth/logout", (route) =>
+      route.fulfill(
+        failLogout
+          ? { status: 503, json: { error: "暂时无法退出，请重试" } }
+          : { json: { ok: true } },
+      ),
+    );
+    await page.goto("/");
+    await expect(
+      page.getByRole("heading", {
+        name: stage === "welcome" ? "欢迎来到知芽" : "你想先学什么？",
+      }),
+    ).toBeVisible();
+    const exit = page.getByRole("button", { name: "退出建档" });
+    await exit.click();
+    const dialog = page.getByRole("dialog", { name: "退出登录？" });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(exit).toBeFocused();
+    await exit.click();
+    await dialog.getByRole("button", { name: "退出登录", exact: true }).click();
+    await expect(page.getByRole("alert")).toContainText("暂时无法退出");
+    await expect(exit).toBeVisible();
+    failLogout = false;
+    await exit.click();
+    await dialog.getByRole("button", { name: "退出登录", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "登录知芽" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(
+      0,
+    );
+  });
+}
+
+test("mobile destinations show honest empty states and account pages can open the learning profile", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "student",
+        nickname: "小芽",
+        email: "student@example.com",
+        avatar: "",
+      },
+    }),
+  );
+  const state = {
+    id: "session",
+    purpose: "onboarding",
+    messages: [],
+    completed: true,
+    memory: "喜欢动手尝试",
+    memoryVersion: 1,
+    revision: 0,
+    status: "idle",
+    leaseUntil: "",
+    question: null,
+  };
+  await page.route("**/api/learning", (route) =>
+    route.fulfill({ json: state }),
+  );
+  await page.route("**/api/learning/model", (route) =>
+    route.fulfill({ json: { available: false } }),
+  );
+  await page.route("**/api/learning/sync", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.fulfill({ json: state });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await page.getByRole("button", { name: "自由探索" }).click();
+  await expect(
+    page.getByRole("heading", { name: "探索即将开放" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "AI 实验室" }).click();
+  await expect(page.getByRole("heading", { name: "实验准备中" })).toBeVisible();
+  await page.getByRole("button", { name: "用户菜单" }).click();
+  await page.getByRole("button", { name: "个人资料", exact: true }).click();
+  await page.getByRole("button", { name: "用户菜单" }).click();
+  await page.getByRole("button", { name: "学习档案", exact: true }).click();
+  await expect(page.getByRole("region", { name: "学习档案" })).toContainText(
+    "喜欢动手尝试",
+  );
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "返回学习", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+});
+
+test("onboarding blocks navigation until completion, including reload and waiting", async ({
+  page,
+}) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "student",
+        nickname: "小芽",
+        email: "student@example.com",
+        avatar: "",
+      },
+    }),
+  );
+  let completed = false;
+  let waiting = false;
+  let attempts = 0;
+  const state = () => ({
+    id: "session",
+    purpose: "onboarding",
+    messages: [],
+    completed,
+    memory: "喜欢动手尝试",
+    memoryVersion: 1,
+    revision: completed ? 2 : waiting ? 1 : 0,
+    status: waiting ? "running" : "waiting",
+    leaseUntil: "2099-01-01T00:00:00Z",
+    question:
+      waiting || completed
+        ? null
+        : {
+            id: "question",
+            text: "你想怎样认识 AI？",
+            kind: "single",
+            options: ["看个例子", "自己试试"],
+          },
+  });
+  await page.route("**/api/learning", (route) =>
+    route.fulfill({ json: state() }),
+  );
+  await page.route("**/api/learning/model", (route) =>
+    route.fulfill({ json: { available: false } }),
+  );
+  await page.route("**/api/learning/sync", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.fulfill({ json: state() });
+  });
+  await page.route("**/api/learning/action", (route) => {
+    attempts++;
+    if (attempts === 1)
+      return route.fulfill({ status: 503, json: { error: "暂时无法提交" } });
+    waiting = true;
+    return route.fulfill({ json: state() });
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "你想怎样认识 AI？" }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "用户菜单" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "主导航" })).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("textbox")).toHaveCount(0);
+  await page.getByRole("radio", { name: "自己试试", exact: true }).check();
+  await page.getByRole("radio", { name: "自己填写", exact: true }).check();
+  await expect(
+    page.getByRole("radio", { name: "自己试试", exact: true }),
+  ).not.toBeChecked();
+  await page.getByRole("textbox", { name: "你的回答" }).fill("我用过 Scratch");
+  await page.screenshot({
+    path: "test-results/onboarding-fullscreen-desktop.png",
+  });
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(
+      page.getByRole("button", { name: "提交回答" }),
+    ).toBeInViewport();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: `test-results/onboarding-fullscreen-${width}.png`,
+    });
+  }
+  const answer = page.getByRole("textbox", { name: "你的回答" });
+  await answer.dispatchEvent("compositionstart");
+  await answer.press("Enter");
+  await answer.dispatchEvent("compositionend");
+  expect(attempts).toBe(0);
+  await answer.fill("我用过 Scratch");
+  await answer.press("Shift+Enter");
+  await expect(answer).toHaveValue("我用过 Scratch\n");
+  await answer.press("Enter");
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(answer).toHaveValue("我用过 Scratch\n");
+  await expect(
+    page.getByRole("radio", { name: "自己填写", exact: true }),
+  ).toBeChecked();
+  await answer.press("Enter");
+  await expect(page.getByRole("status", { name: "正在思考" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "用户菜单" })).toHaveCount(0);
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  expect(
+    await page
+      .getByRole("status", { name: "正在思考" })
+      .evaluate((element) => element.getAnimations({ subtree: true }).length),
+  ).toBe(0);
+  await page.screenshot({ path: "test-results/onboarding-wait-dark.png" });
+  completed = true;
+  waiting = false;
+  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "用户菜单" })).toBeVisible();
+});

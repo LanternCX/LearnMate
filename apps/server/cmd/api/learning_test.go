@@ -156,3 +156,76 @@ func TestInterruptedQuestionRestoresWithoutExecutingItTwice(t *testing.T) {
 		t.Fatalf("resuming fabricated a result: %v", state)
 	}
 }
+
+func TestEndingCorrectionDiscardsQuestionAndRejectsLateWork(t *testing.T) {
+	a := setupAccountTest(t)
+	c := a.register("end-correction@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, 200)["runId"].(string)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "end_correction"}, 409)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "message", "runId": run, "message": toolMessage("saved", "update_memory", map[string]any{"content": "原有档案", "version": 0})}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "tool", "runId": run, "toolCallId": "saved"}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "message", "runId": run, "message": toolMessage("done", "complete_onboarding", map[string]any{})}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "tool", "runId": run, "toolCallId": "done"}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "message", "runId": run, "message": toolMessage("pending", "ask_student", map[string]any{"text": "需要怎样调整？", "kind": "single", "options": []string{"示例", "练习"}})}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "tool", "runId": run, "toolCallId": "pending"}, 200)
+	before := a.request(c, "GET", "/learning", nil, 200)
+	state := a.request(c, "POST", "/learning/action", map[string]any{"action": "end_correction"}, 200)
+	if state["question"] != nil || state["status"] != "idle" || state["correctionEnded"] != true || state["memory"] != "原有档案" {
+		t.Fatal(state)
+	}
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "tool", "runId": run, "toolCallId": "pending"}, 409)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, 409)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "claim", "correctionText": "迟到的请求", "revision": before["revision"]}, 409)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "answer", "toolCallId": "pending", "answer": map[string]any{"selected": []string{"示例"}}}, 409)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "claim", "correctionText": "新的一次修改", "revision": state["revision"]}, 200)
+	next := a.request(c, "GET", "/learning", nil, 200)
+	if next["correctionEnded"] != false || next["question"] != nil {
+		t.Fatal(next)
+	}
+}
+
+func TestEndingCorrectionCancelsUpstreamGeneration(t *testing.T) {
+	started, canceled := make(chan struct{}), make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		close(started)
+		select {
+		case <-r.Context().Done():
+			close(canceled)
+		case <-time.After(10 * time.Second):
+		}
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "test-model")
+	a := setupAccountTest(t)
+	c := a.register("cancel-upstream@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, 200)["runId"].(string)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "message", "runId": run, "message": toolMessage("done", "complete_onboarding", map[string]any{})}, 200)
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "tool", "runId": run, "toolCallId": "done"}, 200)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Zhiya-Request", "1")
+		res, err := c.Do(req)
+		if err == nil {
+			_, _ = io.Copy(io.Discard, res.Body)
+			res.Body.Close()
+		}
+	}()
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("generation did not start")
+	}
+	a.request(c, "POST", "/learning/action", map[string]any{"action": "end_correction"}, 200)
+	select {
+	case <-canceled:
+	case <-time.After(3 * time.Second):
+		t.Error("ended correction left upstream running")
+	}
+	<-done
+}

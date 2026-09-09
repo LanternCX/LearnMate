@@ -25,6 +25,7 @@ export type Conversation = {
   messages: AgentMessage[];
   question: Question | null;
   completed: boolean;
+  correctionEnded: boolean;
   memory: string;
   memoryVersion: number;
   revision: number;
@@ -33,6 +34,37 @@ export type Conversation = {
 };
 export type Answer = { selected: string[]; text: string; skipped: boolean };
 export type ModelInfo = { id: string; available: boolean };
+export type AssistantOutput = {
+  text: string;
+  reasoning: string;
+  isReasoning: boolean;
+};
+
+// Derive correction progress from acknowledged tools, not generated prose.
+// Keeping this in the transcript also lets another device resume the same flow.
+export function correctionProgress(state: Conversation) {
+  if (!state.completed || state.correctionEnded) return null;
+  let completedAt = -1;
+  let startedAt = -1;
+  state.messages.forEach((message, index) => {
+    if (message.role === "user") startedAt = index;
+    if (
+      message.role === "toolResult" &&
+      message.toolName === "complete_onboarding" &&
+      !message.isError
+    )
+      completedAt = index;
+  });
+  if (startedAt <= completedAt) return null;
+  let answered = false;
+  let saved = false;
+  for (const message of state.messages.slice(startedAt + 1)) {
+    if (message.role !== "toolResult" || message.isError) continue;
+    if (message.toolName === "ask_student") answered = true;
+    if (message.toolName === "update_memory" && answered) saved = true;
+  }
+  return { answered, saved };
+}
 
 const instructions = `You are Zhiya, an AI learning companion for K12 students learning programming and AI. Get to know this student so future teaching can fit their understanding and learning experience.
 Use ask_student to present one concrete, approachable question at a time. Adapt subsequent questions to the student's actual answers: K12 students differ widely in cognition, expression, and experience. Age is a clue, not an ability label. Explore what helps them learn; interests may inform examples but need not be known. When preferences are unclear, accept uncertainty and start with accessible general approaches. Choose the questions and their order yourself.
@@ -56,9 +88,13 @@ export class LearningSession {
   constructor(
     private info: ModelInfo,
     private update: (state: Conversation) => void,
-    private text: (value: string) => void,
+    private output: (value: AssistantOutput) => void,
   ) {}
+  get isStopped() {
+    return this.stopped;
+  }
   stop() {
+    if (this.stopped) return;
     this.stopped = true;
     this.agent?.abort();
     if (this.runId)
@@ -99,15 +135,25 @@ export class LearningSession {
     throw new Error("会话已离开");
   }
   async run(userText?: string) {
+    const initial = await loadConversation();
+    if (this.stopped) return;
+    const startingCorrection = initial.completed && Boolean(userText);
     const claim = await api<{ runId: string }>("/learning/action", "POST", {
       action: "claim",
+      ...(startingCorrection
+        ? { correctionText: userText, revision: initial.revision }
+        : {}),
     });
     this.runId = claim.runId;
     const heartbeat = setInterval(() => {
       void this.action("heartbeat").catch(() => this.stop());
     }, 10000);
     try {
+      if (this.stopped) return;
       let state = await this.refresh();
+      const correcting =
+        state.completed &&
+        (Boolean(userText) || correctionProgress(state) !== null);
       // Complete persisted calls in their original order before continuing the loop.
       for (const message of state.messages) {
         if (message.role !== "assistant") continue;
@@ -133,6 +179,14 @@ export class LearningSession {
         description,
         parameters,
         execute: async (id) => {
+          if (
+            correcting &&
+            name === "update_memory" &&
+            !correctionProgress(state)?.answered
+          )
+            throw new Error(
+              "Ask the student with ask_student and wait for their answer before updating memory.",
+            );
           const result = await this.execute(id);
           if (result.isError)
             throw new Error(
@@ -175,6 +229,16 @@ export class LearningSession {
           Type.Object({}),
         ),
       ];
+      const messages = [...state.messages];
+      if (correcting && !userText) {
+        // Retry an interrupted structured turn without inventing a student reply.
+        while (messages.at(-1)?.role === "assistant") {
+          const last = messages[messages.length - 1];
+          if (last.role !== "assistant") break;
+          if (last.content.some((block) => block.type === "toolCall")) break;
+          messages.pop();
+        }
+      }
       const model: Model<"openai-completions"> = {
         id: this.info.id,
         name: this.info.id,
@@ -190,11 +254,15 @@ export class LearningSession {
       const agent = new Agent({
         initialState: {
           model,
-          messages: state.messages,
-          tools,
+          messages,
+          tools: correcting
+            ? tools.filter((tool) => tool.name !== "complete_onboarding")
+            : tools,
           systemPrompt: instructions,
         },
         toolExecution: "sequential",
+        shouldStopAfterTurn: () =>
+          Boolean(correcting && correctionProgress(state)?.saved),
         streamFn: (current, context, options) =>
           streamSimple(
             current as Model<"openai-completions">,
@@ -202,34 +270,57 @@ export class LearningSession {
               ...context,
               systemPrompt:
                 instructions +
+                (correcting
+                  ? "\nThis is a structured profile correction. First call ask_student to clarify the requested change, then wait for the student's answer. Ask further questions only when needed. Save the agreed correction with update_memory. Do not replace questions with prose, claim completion in text, or call complete_onboarding."
+                  : "") +
                 `\nCurrent student memory (version ${state.memoryVersion}, JSON encoded background):\n${JSON.stringify(state.memory)}`,
             },
             {
               ...options,
               apiKey: "server-managed",
               maxRetries: 0,
-              fetch: async (_url, init) =>
-                modelRequest(
+              fetch: async (_url, init) => {
+                const payload = JSON.parse(String(init?.body));
+                if (correcting) {
+                  payload.tool_choice = correctionProgress(state)?.answered
+                    ? "required"
+                    : { type: "function", function: { name: "ask_student" } };
+                  payload.parallel_tool_calls = false;
+                }
+                return modelRequest(
                   this.runId,
-                  JSON.parse(String(init?.body)),
+                  payload,
                   init?.signal ?? undefined,
-                ),
+                );
+              },
             },
           ),
       });
       this.agent = agent;
       agent.subscribe(async (event) => {
+        if (this.stopped) return;
         if (
-          event.type === "message_update" &&
-          event.assistantMessageEvent.type === "text_delta"
+          (event.type === "message_start" ||
+            event.type === "message_update" ||
+            event.type === "message_end") &&
+          event.message.role === "assistant"
         ) {
           const message = event.message as AssistantMessage;
-          this.text(
-            message.content
+          this.output({
+            text: message.content
               .filter((b) => b.type === "text")
               .map((b) => b.text)
               .join(""),
-          );
+            reasoning: message.content
+              .filter((b) => b.type === "thinking")
+              .map((b) => b.thinking)
+              .join("\n\n"),
+            isReasoning:
+              event.type === "message_update" &&
+              ["thinking_start", "thinking_delta"].includes(
+                event.assistantMessageEvent.type,
+              ),
+          });
         }
         if (
           event.type === "message_end" &&
@@ -259,13 +350,15 @@ export class LearningSession {
         }
       });
       if (this.stopped) return;
-      if (userText) await agent.prompt(userText);
+      if (userText && !startingCorrection) await agent.prompt(userText);
       else if (state.messages.length === 0)
         await agent.prompt("请开始认识我，帮助我找到适合自己的学习方式。");
-      else if (state.messages.at(-1)?.role !== "assistant")
+      else if (agent.state.messages.at(-1)?.role !== "assistant")
         await agent.continue();
       if (agent.state.errorMessage)
         throw new Error("交流暂时中断了，你的回答已保存，请重试。");
+      if (correcting && !correctionProgress(state)?.saved)
+        throw new Error("档案修改尚未完成，请继续交流。你的已提交回答已保留。");
     } finally {
       clearInterval(heartbeat);
       // Release only this execution; a replacement run's token cannot be affected.

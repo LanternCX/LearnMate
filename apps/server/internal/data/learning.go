@@ -17,18 +17,19 @@ type Question struct {
 }
 
 type Conversation struct {
-	ID            string            `json:"id"`
-	Purpose       string            `json:"purpose"`
-	Messages      []json.RawMessage `json:"messages"`
-	Question      *Question         `json:"question"`
-	Completed     bool              `json:"completed"`
-	Memory        string            `json:"memory"`
-	MemoryVersion int               `json:"memoryVersion"`
-	Revision      int               `json:"revision"`
-	Status        string            `json:"status"`
-	RunID         string            `json:"runId,omitempty"`
-	Inference     bool              `json:"inference"`
-	LeaseUntil    time.Time         `json:"leaseUntil"`
+	ID              string            `json:"id"`
+	Purpose         string            `json:"purpose"`
+	Messages        []json.RawMessage `json:"messages"`
+	Question        *Question         `json:"question"`
+	Completed       bool              `json:"completed"`
+	CorrectionEnded bool              `json:"correctionEnded"`
+	Memory          string            `json:"memory"`
+	MemoryVersion   int               `json:"memoryVersion"`
+	Revision        int               `json:"revision"`
+	Status          string            `json:"status"`
+	RunID           string            `json:"runId,omitempty"`
+	Inference       bool              `json:"inference"`
+	LeaseUntil      time.Time         `json:"leaseUntil"`
 }
 
 type LearningModel struct{ db database }

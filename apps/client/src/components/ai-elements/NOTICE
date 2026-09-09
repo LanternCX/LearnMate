@@ -1,0 +1,8 @@
+AI Elements
+Copyright 2023 Vercel, Inc.
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+Source registry: https://elements.ai-sdk.dev/api/registry/{name}.json
+Components are installed on demand through apps/client/components.json.
+Local adaptations: Shimmer respects reduced motion; Prompt Input's submit
+spinner is decorative because the button provides the accessible label.
