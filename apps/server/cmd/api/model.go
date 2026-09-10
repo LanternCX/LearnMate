@@ -33,7 +33,7 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	var user string
 	err := a.withUser(r, data.StandardTransaction, func(m data.Models, u data.User) error {
-		c, err := m.Learning.Load(r.Context(), u.ID)
+		c, err := m.Learning.LoadForAction(r.Context(), u.ID)
 		if err != nil {
 			return err
 		}
@@ -53,6 +53,7 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var finished sync.Once
+	completed := false
 	finish := func() {
 		finished.Do(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -66,38 +67,29 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 					return nil
 				}
 				c.Inference = false
-				c.LeaseUntil = time.Now().Add(runLease)
+				if completed {
+					c.LeaseUntil = time.Now().Add(runLease)
+				} else {
+					c.RunID = ""
+					c.LeaseUntil = time.Time{}
+					if c.Question != nil {
+						c.Status = "waiting"
+					} else {
+						c.Status = "idle"
+					}
+				}
 				return m.Learning.Save(ctx, user, &c)
 			})
 		})
 	}
 	defer finish()
-	// Observe persisted ownership so stopping works across devices and server instances.
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
-	go func() {
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				owned := false
-				err := a.models.Transaction(ctx, data.StandardTransaction, func(m data.Models) error {
-					c, err := m.Learning.Load(ctx, user)
-					if err == nil {
-						owned = c.RunID == input.RunID
-					}
-					return err
-				})
-				if err != nil || !owned {
-					cancel()
-					return
-				}
-			}
-		}
-	}()
+	unregister := a.learningHub.registerExecution(user, input.RunID, cancel)
+	defer unregister()
+	if current, snapshotErr := a.models.Learning.Snapshot(ctx, user, 1<<30); snapshotErr != nil || current.RunID != input.RunID {
+		cancel()
+	}
 	if input.Payload == nil {
 		a.respondError(w, bad("模型请求无效"))
 		return
@@ -134,6 +126,7 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 		// Clear inference before the terminal event reaches Pi: it can immediately
 		// persist the assistant message and execute its next tool.
 		if strings.TrimSpace(line) == "data: [DONE]" {
+			completed = true
 			finish()
 		}
 		if len(line) > 0 {

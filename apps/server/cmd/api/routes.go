@@ -9,9 +9,8 @@ import (
 
 func (a *application) routes() http.Handler {
 	api := http.NewServeMux()
-	api.HandleFunc("GET /api/learning", a.learning)
-	api.HandleFunc("POST /api/learning/action", a.learningAction)
-	api.HandleFunc("POST /api/learning/sync", a.learningSync)
+	api.HandleFunc("GET /api/learning/socket", a.learningSocket)
+	api.HandleFunc("POST /api/learning/socket-ticket", a.learningSocketTicket)
 	api.HandleFunc("GET /api/learning/model", a.modelInfo)
 	api.HandleFunc("POST /api/learning/model", a.modelProxy)
 	api.HandleFunc("GET /api/account-rules", func(w http.ResponseWriter, r *http.Request) {

@@ -12,6 +12,12 @@ CREATE TABLE IF NOT EXISTS sessions (
  expires_at timestamptz NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
+CREATE TABLE IF NOT EXISTS socket_tickets (
+ token_hash text PRIMARY KEY,
+ session_hash text NOT NULL REFERENCES sessions(token_hash) ON DELETE CASCADE,
+ user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ expires_at timestamptz NOT NULL
+);
 CREATE TABLE IF NOT EXISTS challenges (
  id text PRIMARY KEY,
  purpose text NOT NULL,
@@ -41,6 +47,19 @@ CREATE TABLE IF NOT EXISTS conversations (
  purpose text NOT NULL,
  state jsonb NOT NULL,
  UNIQUE(user_id, purpose)
+);
+CREATE TABLE IF NOT EXISTS conversation_messages (
+ conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+ sequence integer NOT NULL,
+ message jsonb NOT NULL,
+ PRIMARY KEY(conversation_id, sequence)
+);
+CREATE TABLE IF NOT EXISTS conversation_requests (
+ conversation_id uuid NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+ request_id text NOT NULL,
+ response jsonb NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(conversation_id, request_id)
 );
 CREATE TABLE IF NOT EXISTS student_memories (
  user_id text PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockLearning } from "./mock-learning";
 
 for (const kind of ["multiple", "text", "skip"] as const) {
   test(`standard answer controls preserve ${kind} submission semantics`, async ({
@@ -22,6 +23,7 @@ for (const kind of ["multiple", "text", "skip"] as const) {
       messages: [],
       memory: "",
       memoryVersion: 0,
+      messageSequence: 0,
       revision: completed ? 1 : 0,
       status: "waiting",
       leaseUntil: "",
@@ -34,22 +36,17 @@ for (const kind of ["multiple", "text", "skip"] as const) {
             options: kind === "text" ? [] : ["Scratch", "Python"],
           },
     });
-    await page.route("**/api/learning", (r) => r.fulfill({ json: state() }));
     await page.route("**/api/learning/model", (r) =>
       r.fulfill({ json: { available: false } }),
     );
-    await page.route("**/api/learning/sync", async (r) => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      await r.fulfill({ json: state() });
-    });
-    await page.route("**/api/learning/action", (r) => {
-      expect(r.request().postDataJSON().answer).toEqual({
+    await mockLearning(page, state, (action) => {
+      expect(action.answer).toEqual({
         selected: kind === "multiple" ? ["Scratch", "Python"] : [],
         text: kind === "text" ? "我用过 Scratch" : "",
         skipped: kind === "skip",
       });
       completed = true;
-      return r.fulfill({ json: state() });
+      return { state: state() };
     });
     await page.goto("/");
     if (kind === "multiple") {
@@ -98,6 +95,7 @@ test("AI reasoning is shown only when returned, can be reopened, and normal wait
     question: null,
     memory: "",
     memoryVersion: 0,
+    messageSequence: hasReasoning ? 1 : 0,
     revision: hasReasoning ? (running ? 1 : 2) : 0,
     status: running ? "running" : "idle",
     leaseUntil: "2099-01-01T00:00:00Z",
@@ -118,24 +116,18 @@ test("AI reasoning is shown only when returned, can be reopened, and normal wait
         ]
       : [],
   });
-  await page.route("**/api/learning", (r) => r.fulfill({ json: state() }));
   await page.route("**/api/learning/model", (r) =>
     r.fulfill({ json: { available: false } }),
   );
-  await page.route("**/api/learning/sync", async (r) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    await r.fulfill({ json: state() });
-  });
+  const learning = await mockLearning(page, state);
   await page.goto("/");
   await expect(page.getByRole("status", { name: "正在思考" })).toContainText(
     "思考中",
   );
   await expect(page.getByRole("button", { name: /思考/ })).toHaveCount(0);
   hasReasoning = true;
-  await expect(
-    page.getByText("先了解学习经验，再选择合适的起点。", { exact: true }),
-  ).toBeVisible();
   running = false;
+  learning.sync(state());
   const trigger = page.getByRole("button", { name: /已思考/ });
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
   await trigger.click();

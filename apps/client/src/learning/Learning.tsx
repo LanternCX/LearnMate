@@ -3,16 +3,14 @@ import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Checkbox } from "../components/ui/checkbox";
 import { api, APIError, type User } from "../api";
 import {
-  answerQuestion,
   correctionProgress,
   LearningSession,
-  loadConversation,
-  syncConversation,
   type Conversation,
   type ModelInfo,
   type Question,
   type AssistantOutput,
 } from "./session";
+import { ConversationChannel } from "./channel";
 import "./learning.css";
 import Mark from "../components/Mark";
 import Icon from "../components/Icon";
@@ -64,6 +62,7 @@ export default function Learning({
   const paused = useRef(false);
   const [introduced, setIntroduced] = useState(false);
   const session = useRef<LearningSession | null>(null);
+  const channel = useRef<ConversationChannel | null>(null);
   const generation = useRef(0);
   const latest = useRef<Conversation | null>(null);
   const alive = useRef(true);
@@ -80,10 +79,11 @@ export default function Learning({
     setState(next);
   };
   const run = async (model: ModelInfo, text?: string) => {
-    if (session.current || !alive.current) return false;
+    if (session.current || !channel.current || !alive.current) return false;
     const epoch = generation.current;
     const current = new LearningSession(
       model,
+      channel.current,
       (next) => {
         if (generation.current === epoch) receive(next);
       },
@@ -125,9 +125,10 @@ export default function Learning({
     if (!ending) return;
     paused.current = true;
     session.current?.stop();
-    void api<Conversation>("/learning/action", "POST", {
-      action: "end_correction",
-    })
+    void channel.current
+      ?.action<Conversation>({
+        action: "end_correction",
+      })
       .then((next) => {
         if (!alive.current) return;
         receive(next);
@@ -160,10 +161,16 @@ export default function Learning({
     alive.current = true;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    const connection = new ConversationChannel();
+    channel.current = connection;
+    const unsubscribe = connection.subscribe((next) => {
+      if (disposed) return;
+      receive(next);
+    });
     const start = async () => {
       try {
         const [initial, model] = await Promise.all([
-          loadConversation(),
+          connection.open(),
           api<ModelInfo>("/learning/model"),
         ]);
         if (disposed) return;
@@ -173,28 +180,21 @@ export default function Learning({
           !correctionProgress(initial)?.saved
         ) {
           receive(
-            await api<Conversation>("/learning/action", "POST", {
+            await connection.action<Conversation>({
               action: "end_correction",
             }),
           );
         }
         setInfo(model);
-        while (!disposed) {
-          const next = await syncConversation(
-            latest.current?.revision ?? initial.revision,
-          );
-          if (disposed) return;
-          receive(next);
-          if (
-            model.available &&
-            !next.completed &&
-            !paused.current &&
-            !session.current &&
-            next.status === "running" &&
-            Date.parse(next.leaseUntil) < Date.now()
-          )
-            void run(model);
-        }
+        if (
+          model.available &&
+          !initial.completed &&
+          !paused.current &&
+          !session.current &&
+          initial.status === "running" &&
+          Date.parse(initial.leaseUntil) < Date.now()
+        )
+          void run(model);
       } catch (e) {
         if (disposed) return;
         setError(e instanceof Error ? e.message : "暂时无法同步，请重试");
@@ -207,8 +207,11 @@ export default function Learning({
       generation.current++;
       alive.current = false;
       clearTimeout(retry);
+      unsubscribe();
       session.current?.stop();
       session.current = null;
+      connection.close();
+      if (channel.current === connection) channel.current = null;
     };
   }, [user.id]);
   const active =
@@ -311,9 +314,13 @@ export default function Learning({
                         (!state.completed || (memoryOpen && !editing))
                       }
                       submit={async (answer) => {
-                        const next = await answerQuestion(
-                          state.question!.id,
-                          answer,
+                        if (!channel.current) throw new Error("会话尚未连接");
+                        const next = await channel.current.action<Conversation>(
+                          {
+                            action: "answer",
+                            toolCallId: state.question!.id,
+                            answer,
+                          },
                         );
                         receive(next);
                         setLiveOutput(null);

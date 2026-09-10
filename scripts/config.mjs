@@ -52,5 +52,8 @@ function validateOrigin(value, development) {
 }
 
 export function publicBuildConfig(config) {
-  return { requestTimeoutMilliseconds: config.request_timeout_seconds * 1000 };
+  return {
+    apiOrigin: config.api_origin,
+    requestTimeoutMilliseconds: config.request_timeout_seconds * 1000,
+  };
 }

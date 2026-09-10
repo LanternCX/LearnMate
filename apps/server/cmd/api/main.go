@@ -17,9 +17,10 @@ import (
 )
 
 type application struct {
-	models data.Models
-	send   func(to, purpose, code string) error
-	config config.Config
+	models      data.Models
+	send        func(to, purpose, code string) error
+	config      config.Config
+	learningHub *learningHub
 }
 
 func main() {
@@ -53,8 +54,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := &application{models: data.NewModels(db, cfg.Account), send: send, config: cfg}
+	app := &application{models: data.NewModels(db, cfg.Account), send: send, config: cfg, learningHub: newLearningHub()}
 	err = app.models.Initialize(startup)
+	if err == nil {
+		err = app.startLearningEvents(ctx)
+	}
 	cancel()
 	if err != nil {
 		log.Fatal("database initialization failed: ", err)

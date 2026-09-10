@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockLearning } from "./mock-learning";
 
 test("profile correction stays in the main panel and preserves the draft on failure", async ({
   page,
@@ -21,32 +22,29 @@ test("profile correction stays in the main panel and preserves the draft on fail
     messages: [],
     memory: "喜欢先看例子",
     memoryVersion: 1,
+    messageSequence: 0,
     revision: 0,
     status: "idle",
     leaseUntil: "",
   };
-  await page.route("**/api/learning", (r) => r.fulfill({ json: state }));
   await page.route("**/api/learning/model", (r) =>
     r.fulfill({ json: { id: "test", available: true } }),
   );
-  await page.route("**/api/learning/sync", async (r) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    await r.fulfill({ json: state });
-  });
   let failClaim: () => void = () => {};
   const claim = new Promise<void>((resolve) => {
     failClaim = resolve;
   });
-  await page.route("**/api/learning/action", async (r) => {
-    if (r.request().postDataJSON().action === "end_correction") {
-      await r.fulfill({
-        json: { ...state, correctionEnded: true, revision: 1 },
-      });
-      return;
-    }
-    await claim;
-    await r.fulfill({ status: 503, json: { error: "暂时无法修改，请重试" } });
-  });
+  await mockLearning(
+    page,
+    () => state,
+    async (action) => {
+      if (action.action === "end_correction") {
+        return { state: { ...state, correctionEnded: true, revision: 1 } };
+      }
+      await claim;
+      throw new Error("暂时无法修改，请重试");
+    },
+  );
   await page.goto("/");
   await page.getByRole("button", { name: "自由探索" }).click();
   await page.getByRole("button", { name: "用户菜单" }).click();

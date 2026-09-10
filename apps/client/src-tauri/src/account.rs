@@ -16,10 +16,8 @@ fn allowed(method: &str, path: &str) -> bool {
     matches!(
         (method, path),
         ("GET", "/me")
-            | ("GET", "/learning")
             | ("GET", "/learning/model")
-            | ("POST", "/learning/action")
-            | ("POST", "/learning/sync")
+            | ("POST", "/learning/socket-ticket")
             | ("GET", "/account-rules")
             | ("PATCH", "/me")
             | ("DELETE", "/me")
@@ -39,9 +37,10 @@ fn allowed(method: &str, path: &str) -> bool {
 
 #[test]
 fn learning_bridge_accepts_only_fixed_learning_routes() {
-    assert!(allowed("GET", "/learning"));
-    assert!(allowed("POST", "/learning/action"));
-    assert!(allowed("POST", "/learning/sync"));
+    assert!(allowed("POST", "/learning/socket-ticket"));
+    assert!(!allowed("GET", "/learning"));
+    assert!(!allowed("POST", "/learning/action"));
+    assert!(!allowed("POST", "/learning/sync"));
     assert!(!allowed("POST", "/learning/../auth/login"));
     assert!(!allowed("POST", "/learning/model"));
 }
@@ -58,8 +57,8 @@ fn request(
     if cfg!(target_os = "android") {
         return Err("Android secure credential storage must be configured before use".into());
     }
-    // Learning requests cannot mutate native credentials and must run alongside
-    // long polling. Account identity changes retain their existing mutex.
+    // Learning metadata and socket tickets cannot mutate native credentials.
+    // Account identity changes retain their existing mutex.
     let learning = path.starts_with("/learning");
     let _guard = if learning {
         None
