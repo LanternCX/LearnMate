@@ -67,3 +67,24 @@ CREATE TABLE IF NOT EXISTS student_memories (
  version integer NOT NULL DEFAULT 0,
  updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS courses (
+ id uuid PRIMARY KEY,
+ user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ title text NOT NULL,
+ topic text NOT NULL,
+ cover_motif text NOT NULL,
+ cover_palette text NOT NULL,
+ cover_label text NOT NULL,
+ status text NOT NULL DEFAULT 'active',
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS courses_user_updated ON courses(user_id,updated_at DESC);
+CREATE TABLE IF NOT EXISTS course_conversations (
+ id uuid PRIMARY KEY,
+ course_id uuid NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+ state jsonb NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS course_conversations_course ON course_conversations(course_id,created_at);

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -314,6 +315,71 @@ func TestModelProxyUsesServerCredentialsAndRequiresExecution(t *testing.T) {
 	if res.StatusCode != 200 || string(raw) != "data: [DONE]\n\n" {
 		t.Fatalf("proxy: %d %s", res.StatusCode, raw)
 	}
+}
+
+func TestCourseModelProxyAllowsTeacherAndSlidesToStreamConcurrently(t *testing.T) {
+	started := make(chan string, 2)
+	release := make(chan struct{})
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&payload)
+		if payload["model"] != "course-model" {
+			t.Errorf("model = %v", payload["model"])
+		}
+		started <- r.Header.Get("X-Zhiya-Agent")
+		<-release
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "course-model")
+	t.Setenv("ZHIYA_SERVER_MODEL_API_KEY", "course-secret")
+	a := setupAccountTest(t)
+	c := a.register("course-streams@example.com")
+
+	request := func(agent string) <-chan int {
+		result := make(chan int, 1)
+		go func() {
+			body, _ := json.Marshal(map[string]any{"agent": agent, "payload": map[string]any{"model": "client-model", "messages": []any{}}})
+			req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/course/model", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Zhiya-Request", "1")
+			for _, cookie := range c.Jar.Cookies(req.URL) {
+				req.AddCookie(cookie)
+			}
+			res, err := c.Do(req)
+			if err != nil {
+				result <- 0
+				return
+			}
+			defer res.Body.Close()
+			_, _ = io.ReadAll(res.Body)
+			result <- res.StatusCode
+		}()
+		return result
+	}
+
+	teacher := request("teacher")
+	slides := request("slides")
+	roles := map[string]bool{}
+	for range 2 {
+		select {
+		case role := <-started:
+			roles[role] = true
+		case <-time.After(2 * time.Second):
+			close(release)
+			t.Fatalf("concurrent course streams did not reach upstream: %v", roles)
+		}
+	}
+	if !roles["teacher"] || !roles["slides"] {
+		t.Fatalf("upstream roles = %v", roles)
+	}
+	close(release)
+	if <-teacher != http.StatusOK || <-slides != http.StatusOK {
+		t.Fatal("course model streams did not complete")
+	}
+	a.request(c, "POST", "/learning/course/model", map[string]any{"agent": "other", "payload": map[string]any{}}, http.StatusBadRequest)
 }
 
 func toolMessage(id, name string, arguments any) map[string]any {

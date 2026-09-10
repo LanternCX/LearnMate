@@ -13,6 +13,13 @@ func (a *application) routes() http.Handler {
 	api.HandleFunc("POST /api/learning/socket-ticket", a.learningSocketTicket)
 	api.HandleFunc("GET /api/learning/model", a.modelInfo)
 	api.HandleFunc("POST /api/learning/model", a.modelProxy)
+	api.HandleFunc("POST /api/learning/course/model", a.courseModelProxy)
+	api.HandleFunc("GET /api/courses", a.listCourses)
+	api.HandleFunc("POST /api/courses", a.createCourse)
+	api.HandleFunc("GET /api/courses/{id}", a.getCourse)
+	api.HandleFunc("PATCH /api/courses/{id}", a.updateCourse)
+	api.HandleFunc("DELETE /api/courses/{id}", a.deleteCourse)
+	api.HandleFunc("PUT /api/courses/{id}/conversation", a.saveCourseConversation)
 	api.HandleFunc("GET /api/account-rules", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, data.AccountRules())
 	})

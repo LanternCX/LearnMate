@@ -19,7 +19,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
     );
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: "课程准备中" }),
+      page.getByRole("heading", { name: "今天想学什么？" }),
     ).toBeVisible();
     await page.getByRole("button", { name: "用户菜单" }).click();
     await page.getByRole("button", { name: "学习档案", exact: true }).click();
@@ -38,7 +38,7 @@ for (const reducedMotion of ["no-preference", "reduce"] as const) {
       await page.getByRole("button", { name, exact: true }).click();
     }
     await expect(
-      page.getByRole("heading", { name: "课程准备中" }),
+      page.getByRole("heading", { name: "今天想学什么？" }),
     ).toBeInViewport();
     await page.getByRole("button", { name: "收起侧栏" }).click();
     await expect(page.getByRole("button", { name: "展开侧栏" })).toBeVisible();

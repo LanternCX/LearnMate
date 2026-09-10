@@ -6,6 +6,12 @@ import Learning from "./learning/Learning";
 import Mark from "./components/Mark";
 import Icon, { type IconName } from "./components/Icon";
 import ThemeToggle from "./components/ThemeToggle";
+import {
+  deleteCourse,
+  listCourses,
+  updateCourse,
+  type StoredCourse,
+} from "./learning/courses";
 import "./workspace.css";
 
 const destinations: {
@@ -14,7 +20,7 @@ const destinations: {
   title: string;
   empty: string;
 }[] = [
-  { id: "learning", label: "学习", title: "学习地图", empty: "课程准备中" },
+  { id: "learning", label: "学习", title: "学习地图", empty: "今天想学什么？" },
   { id: "explore", label: "探索", title: "自由探索", empty: "探索即将开放" },
   { id: "lab", label: "实验", title: "AI 实验室", empty: "实验准备中" },
   { id: "review", label: "回顾", title: "学习回顾", empty: "还没有学习记录" },
@@ -35,10 +41,32 @@ export default function Workspace({
   const [endingMemory, setEndingMemory] = useState(false);
   const [onboarding, setOnboarding] = useState(true);
   const [destination, setDestination] = useState(destinations[0]);
+  const [courses, setCourses] = useState<StoredCourse[]>([]);
+  const [activeCourse, setActiveCourse] = useState<StoredCourse | null>(null);
+  const [coursesReady, setCoursesReady] = useState(false);
+  const [courseRoomToken, setCourseRoomToken] = useState(0);
+  const [courseError, setCourseError] = useState("");
   const menu = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const onboardingExit = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    let current = true;
+    setCoursesReady(false);
+    void listCourses()
+      .then((next) => {
+        if (!current) return;
+        setCourses(next);
+        setActiveCourse(null);
+        setCourseError("");
+      })
+      .catch(() => current && setCourseError("暂时无法读取课程"))
+      .finally(() => current && setCoursesReady(true));
+    return () => {
+      current = false;
+    };
+  }, [user?.id]);
   useEffect(() => {
     if (wasConfirming.current && !account.confirmation)
       (onboarding ? onboardingExit : trigger).current?.focus();
@@ -79,8 +107,43 @@ export default function Workspace({
     if (await navigate("home")) {
       setMemoryOpen(false);
       setDestination(next);
+      if (next.id === "learning") {
+        setActiveCourse(null);
+        setCourseRoomToken((value) => value + 1);
+      }
     }
   };
+  const renameCourse = async (course: StoredCourse, title: string) => {
+    try {
+      const updated = await updateCourse(course.id, { title });
+      setCourses((all) =>
+        all.map((item) => (item.id === updated.id ? updated : item)),
+      );
+      if (activeCourse?.id === updated.id) setActiveCourse(updated);
+      setCourseError("");
+      return true;
+    } catch {
+      setCourseError("暂时无法重命名课程");
+      return false;
+    }
+  };
+  const removeCourse = async (course: StoredCourse) => {
+    try {
+      await deleteCourse(course.id);
+      const remaining = courses.filter((item) => item.id !== course.id);
+      setCourses(remaining);
+      setCourseError("");
+      return true;
+    } catch {
+      setCourseError("暂时无法删除课程");
+      return false;
+    }
+  };
+  const courseOpen =
+    view === "home" &&
+    !memoryOpen &&
+    destination.id === "learning" &&
+    Boolean(activeCourse);
   return (
     <div
       className={`workspace ${collapsed ? "is-collapsed" : ""} ${onboarding ? "is-onboarding" : ""}`}
@@ -192,25 +255,46 @@ export default function Workspace({
           >
             <Icon name="sidebar" />
           </button>
-          {(view !== "home" || memoryOpen) && (
+          {(view !== "home" || memoryOpen || courseOpen) && (
             <button
               className="icon-button"
               aria-label={
-                memoryOpen && !editingMemory ? "停止对话" : "返回学习"
+                courseOpen
+                  ? "返回课程列表"
+                  : memoryOpen && !editingMemory
+                    ? "停止对话"
+                    : "返回学习"
               }
-              title={memoryOpen && !editingMemory ? "停止对话" : "返回学习"}
+              title={
+                courseOpen
+                  ? "返回课程列表"
+                  : memoryOpen && !editingMemory
+                    ? "停止对话"
+                    : "返回学习"
+              }
               disabled={endingMemory}
-              onClick={() =>
-                memoryOpen && !editingMemory
-                  ? setEndingMemory(true)
-                  : go(destinations[0])
-              }
+              onClick={() => {
+                if (courseOpen) {
+                  setActiveCourse(null);
+                  setCourseRoomToken((value) => value + 1);
+                } else if (memoryOpen && !editingMemory) {
+                  setEndingMemory(true);
+                } else {
+                  void go(destinations[0]);
+                }
+              }}
             >
-              <Icon name={memoryOpen && !editingMemory ? "close" : "back"} />
+              <Icon
+                name={
+                  !courseOpen && memoryOpen && !editingMemory ? "close" : "back"
+                }
+              />
             </button>
           )}
           <span>
-            {memoryOpen
+            {courseOpen
+              ? activeCourse?.title
+              : memoryOpen
               ? "学习档案"
               : view === "home"
                 ? onboarding && destination.id === "learning"
@@ -247,6 +331,34 @@ export default function Workspace({
             ending={endingMemory}
             setEnding={setEndingMemory}
             onOnboardingChange={setOnboarding}
+            courseLibrary={{
+              courses,
+              activeCourse,
+              coursesReady,
+              roomToken: courseRoomToken,
+              error: courseError,
+              onOpen: (course) => {
+                setActiveCourse(course);
+                setCourseRoomToken((value) => value + 1);
+              },
+              onRename: renameCourse,
+              onDelete: removeCourse,
+              onCourseCreated: (course) => {
+                setCourses((all) => [
+                  course,
+                  ...all.filter((item) => item.id !== course.id),
+                ]);
+                setActiveCourse(course);
+              },
+              onCourseUpdated: (course) => {
+                setCourses((all) =>
+                  all.map((item) => (item.id === course.id ? course : item)),
+                );
+                setActiveCourse((current) =>
+                  current?.id === course.id ? course : current,
+                );
+              },
+            }}
           />
           {!onboarding &&
             !memoryOpen &&

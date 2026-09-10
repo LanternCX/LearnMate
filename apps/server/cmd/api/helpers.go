@@ -45,6 +45,8 @@ func errorResponse(err error) (int, string) {
 		e = failure{409, err.Error()}
 	case errors.Is(err, data.ErrRateLimited):
 		e = failure{429, err.Error()}
+	case errors.Is(err, data.ErrCourseNotFound):
+		e = failure{404, "未找到课程"}
 	case errors.Is(err, data.ErrConversationBusy):
 		e = failure{409, err.Error()}
 	default:

@@ -68,7 +68,7 @@ for (const kind of ["multiple", "text", "skip"] as const) {
     }
     await page.getByRole("button", { name: "提交回答", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "课程准备中" }),
+      page.getByRole("heading", { name: "今天想学什么？" }),
     ).toBeVisible();
   });
 }

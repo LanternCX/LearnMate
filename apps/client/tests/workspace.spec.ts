@@ -106,7 +106,7 @@ test("mobile destinations show honest empty states and account pages can open th
   );
   await mockLearning(page, () => state);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await page.getByRole("button", { name: "自由探索" }).click();
   await expect(
     page.getByRole("heading", { name: "探索即将开放" }),
@@ -122,7 +122,7 @@ test("mobile destinations show honest empty states and account pages can open th
   );
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "返回学习", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
 });
 
 test("onboarding blocks navigation until completion, including reload and waiting", async ({
@@ -230,7 +230,7 @@ test("onboarding blocks navigation until completion, including reload and waitin
   completed = true;
   waiting = false;
   learning.sync(state());
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
   await expect(page.getByRole("button", { name: "用户菜单" })).toBeVisible();
 });

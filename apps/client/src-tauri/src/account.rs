@@ -13,7 +13,7 @@ pub struct Response {
 }
 
 fn allowed(method: &str, path: &str) -> bool {
-    matches!(
+    let fixed = matches!(
         (method, path),
         ("GET", "/me")
             | ("GET", "/learning/model")
@@ -32,6 +32,19 @@ fn allowed(method: &str, path: &str) -> bool {
             | ("POST", "/auth/reset/complete")
             | ("POST", "/me/email/start")
             | ("POST", "/me/email/complete")
+            | ("GET", "/courses")
+            | ("POST", "/courses")
+    );
+    if fixed {
+        return true;
+    }
+    let segments: Vec<_> = path.trim_matches('/').split('/').collect();
+    matches!(
+        (method, segments.as_slice()),
+        ("GET" | "PATCH" | "DELETE", ["courses", id]) if !id.is_empty()
+    ) || matches!(
+        (method, segments.as_slice()),
+        ("PUT", ["courses", id, "conversation"]) if !id.is_empty()
     )
 }
 
@@ -43,6 +56,13 @@ fn learning_bridge_accepts_only_fixed_learning_routes() {
     assert!(!allowed("POST", "/learning/sync"));
     assert!(!allowed("POST", "/learning/../auth/login"));
     assert!(!allowed("POST", "/learning/model"));
+    assert!(allowed("GET", "/courses"));
+    assert!(allowed("POST", "/courses"));
+    assert!(allowed("PATCH", "/courses/course-id"));
+    assert!(allowed("DELETE", "/courses/course-id"));
+    assert!(allowed("PUT", "/courses/course-id/conversation"));
+    assert!(!allowed("PUT", "/courses/course-id/other"));
+    assert!(!allowed("DELETE", "/courses/course-id/conversation"));
 }
 
 fn request(
@@ -59,7 +79,7 @@ fn request(
     }
     // Learning metadata and socket tickets cannot mutate native credentials.
     // Account identity changes retain their existing mutex.
-    let learning = path.starts_with("/learning");
+    let learning = path.starts_with("/learning") || path.starts_with("/courses");
     let _guard = if learning {
         None
     } else {
@@ -145,6 +165,7 @@ pub struct ModelPart {
 pub async fn model_request(
     body: String,
     expected_user: String,
+    course: bool,
     on_event: tauri::ipc::Channel<ModelPart>,
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
@@ -162,8 +183,13 @@ pub async fn model_request(
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|_| "Network unavailable")?;
+        let path = if course {
+            "/api/learning/course/model"
+        } else {
+            "/api/learning/model"
+        };
         let mut response = client
-            .post(format!("{}/api/learning/model", base.trim_end_matches('/')))
+            .post(format!("{}{}", base.trim_end_matches('/'), path))
             .header(header::CONTENT_TYPE, "application/json")
             .header("X-Zhiya-Request", "1")
             .header("X-Zhiya-User", expected_user)

@@ -27,7 +27,8 @@
   flex-direction: column;
   min-height: 0;
   padding: 24px 16px 16px;
-  background: transparent;
+  border-right: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 34%, transparent);
 }
 .workspace-brand {
   display: flex;
@@ -263,6 +264,7 @@
   .workspace-sidebar {
     position: static;
     display: contents;
+    border-right: 0;
   }
   .workspace-brand {
     display: none;

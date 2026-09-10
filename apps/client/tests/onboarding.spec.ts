@@ -250,11 +250,11 @@ test("Pi resumes a persisted question across devices and saves memory before com
   ).toBeVisible();
   await other.getByRole("radio", { name: "用过", exact: true }).check();
   await other.getByRole("button", { name: "提交回答", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible({
     timeout: 15000,
   });
   await expect(
-    other.getByRole("heading", { name: "课程准备中" }),
+    other.getByRole("heading", { name: "今天想学什么？" }),
   ).toBeVisible();
   await other.getByRole("button", { name: "用户菜单" }).click();
   await other.getByRole("button", { name: "学习档案", exact: true }).click();
@@ -395,7 +395,7 @@ test("a student answers one concrete question and sees the overview when the age
   ).toBeDisabled();
   await page.getByRole("radio", { name: "看一个例子" }).check();
   await page.getByRole("button", { name: "提交回答", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "学习档案", exact: true }).click();
   await expect(

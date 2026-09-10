@@ -90,53 +90,89 @@ func (a *application) modelProxy(w http.ResponseWriter, r *http.Request) {
 	if current, snapshotErr := a.models.Learning.Snapshot(ctx, user, 1<<30); snapshotErr != nil || current.RunID != input.RunID {
 		cancel()
 	}
-	if input.Payload == nil {
-		a.respondError(w, bad("模型请求无效"))
+	completed = a.streamModel(ctx, w, r, input.Payload, "", finish)
+	return
+}
+
+func (a *application) courseModelProxy(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Agent   string         `json:"agent"`
+		Payload map[string]any `json:"payload"`
+	}
+	if err := a.readJSON(w, r, &input); err != nil {
+		a.respondError(w, err)
 		return
 	}
-	input.Payload["model"] = a.config.Model.ID
-	input.Payload["stream"] = true
-	input.Payload["store"] = false
-	delete(input.Payload, "max_tokens")
-	input.Payload["max_completion_tokens"] = 8192
-	raw, _ := json.Marshal(input.Payload)
+	if input.Agent != "teacher" && input.Agent != "slides" {
+		a.respondError(w, bad("课堂 Agent 无效"))
+		return
+	}
+	if err := a.withUser(r, data.StandardTransaction, func(_ data.Models, _ data.User) error {
+		if a.config.Model.Endpoint == "" {
+			return failure{503, "知芽暂时无法开始教学，请稍后重试"}
+		}
+		return nil
+	}); err != nil {
+		a.respondError(w, err)
+		return
+	}
+	a.streamModel(r.Context(), w, r, input.Payload, input.Agent, nil)
+}
+
+func (a *application) streamModel(ctx context.Context, w http.ResponseWriter, r *http.Request, payload map[string]any, agent string, onDone func()) bool {
+	if payload == nil {
+		a.respondError(w, bad("模型请求无效"))
+		return false
+	}
+	payload["model"] = a.config.Model.ID
+	payload["stream"] = true
+	payload["store"] = false
+	delete(payload, "max_tokens")
+	payload["max_completion_tokens"] = 8192
+	raw, _ := json.Marshal(payload)
 	upstream, err := http.NewRequestWithContext(ctx, "POST", a.config.Model.Endpoint, bytes.NewReader(raw))
 	if err != nil {
 		a.respondError(w, failure{502, "暂时无法连接模型服务"})
-		return
+		return false
 	}
 	upstream.Header.Set("Content-Type", "application/json")
 	upstream.Header.Set("Authorization", "Bearer "+a.config.Model.APIKey)
+	if agent != "" {
+		upstream.Header.Set("X-Zhiya-Agent", agent)
+	}
 	client := &http.Client{Timeout: 120 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}
 	response, err := client.Do(upstream)
 	if err != nil {
 		a.respondError(w, failure{502, "暂时无法连接模型服务，请重试"})
-		return
+		return false
 	}
 	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		a.respondError(w, failure{502, "模型服务暂时不可用，请稍后重试"})
-		return
+		return false
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("X-Accel-Buffering", "no")
 	reader := bufio.NewReader(response.Body)
+	completed := false
 	for {
 		line, readErr := reader.ReadString('\n')
 		// Clear inference before the terminal event reaches Pi: it can immediately
 		// persist the assistant message and execute its next tool.
 		if strings.TrimSpace(line) == "data: [DONE]" {
 			completed = true
-			finish()
+			if onDone != nil {
+				onDone()
+			}
 		}
 		if len(line) > 0 {
 			if _, err = w.Write([]byte(line)); err != nil {
-				return
+				return false
 			}
 			_ = http.NewResponseController(w).Flush()
 		}
 		if readErr != nil {
-			return
+			return completed
 		}
 	}
 }

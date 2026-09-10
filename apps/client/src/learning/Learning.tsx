@@ -14,6 +14,8 @@ import { ConversationChannel } from "./channel";
 import "./learning.css";
 import Mark from "../components/Mark";
 import Icon from "../components/Icon";
+import Course from "./CourseRoom";
+import type { StoredCourse } from "./courses";
 import { Spinner } from "../components/ui/spinner";
 import {
   PromptInput,
@@ -39,6 +41,7 @@ export default function Learning({
   ending,
   setEnding,
   onOnboardingChange,
+  courseLibrary,
   visible = true,
 }: {
   user: User;
@@ -48,6 +51,18 @@ export default function Learning({
   ending: boolean;
   setEnding: (value: boolean) => void;
   onOnboardingChange: (value: boolean) => void;
+  courseLibrary: {
+    courses: StoredCourse[];
+    activeCourse: StoredCourse | null;
+    coursesReady: boolean;
+    roomToken: number;
+    error: string;
+    onOpen: (course: StoredCourse) => void;
+    onRename: (course: StoredCourse, title: string) => Promise<boolean>;
+    onDelete: (course: StoredCourse) => Promise<boolean>;
+    onCourseCreated: (course: StoredCourse) => void;
+    onCourseUpdated: (course: StoredCourse) => void;
+  };
   visible?: boolean;
 }) {
   const [state, setState] = useState<Conversation | null>(null);
@@ -260,13 +275,20 @@ export default function Learning({
       ) : (
         <>
           {state.completed && !memoryOpen && (
-            <div className="workspace-empty">
-              <div className="subject-art learning">
-                <Icon name="learning" />
-              </div>
-              <h1>课程准备中</h1>
-              <p>初次交流已完成</p>
-            </div>
+            <Course
+              info={info}
+              memory={state.memory}
+              courses={courseLibrary.courses}
+              activeCourse={courseLibrary.activeCourse}
+              coursesReady={courseLibrary.coursesReady}
+              roomToken={courseLibrary.roomToken}
+              libraryError={courseLibrary.error}
+              onOpenCourse={courseLibrary.onOpen}
+              onRenameCourse={courseLibrary.onRename}
+              onDeleteCourse={courseLibrary.onDelete}
+              onCourseCreated={courseLibrary.onCourseCreated}
+              onCourseUpdated={courseLibrary.onCourseUpdated}
+            />
           )}
           <div hidden={state.completed && (!memoryOpen || editing)}>
             {!introduced &&

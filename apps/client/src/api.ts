@@ -14,11 +14,34 @@ export async function modelRequest(
   payload: object,
   signal?: AbortSignal,
 ): Promise<Response> {
+  return streamingModelRequest(
+    "/api/learning/model",
+    JSON.stringify({ runId, payload }),
+    signal,
+  );
+}
+
+export async function courseModelRequest(
+  agent: "teacher" | "slides",
+  payload: object,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return streamingModelRequest(
+    "/api/learning/course/model",
+    JSON.stringify({ agent, payload }),
+    signal,
+  );
+}
+
+async function streamingModelRequest(
+  path: string,
+  body: string,
+  signal?: AbortSignal,
+): Promise<Response> {
   const expectedUser = activeUser;
   const revision = sessionRevision;
-  const body = JSON.stringify({ runId, payload });
   if (!isTauri())
-    return fetch("/api/learning/model", {
+    return fetch(path, {
       method: "POST",
       credentials: "same-origin",
       headers: {
@@ -72,6 +95,7 @@ export async function modelRequest(
     void invoke("model_request", {
       body,
       expectedUser,
+      course: path.endsWith("/course/model"),
       onEvent: channel,
     }).catch(fail);
   });

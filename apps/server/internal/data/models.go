@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrNotFound         = errors.New("record not found")
+	ErrCourseNotFound   = errors.New("course not found")
 	ErrInvalidSession   = errors.New("登录已失效，请重新登录")
 	ErrInvalidCode      = errors.New("验证码无效或已过期，请重新获取")
 	ErrEmailInUse       = errors.New("该邮箱无法使用，请换一个邮箱")
@@ -72,6 +73,7 @@ func (m Models) ListenConversationChanges(ctx context.Context, ready chan<- erro
 }
 
 type Models struct {
+	Courses  CourseModel
 	Learning LearningModel
 	Users    UserModel
 	Tokens   TokenModel
@@ -79,7 +81,7 @@ type Models struct {
 }
 
 func NewModels(pool *pgxpool.Pool, policy config.Account) Models {
-	return Models{Learning: LearningModel{db: pool}, Users: UserModel{db: pool}, Tokens: TokenModel{db: pool, policy: policy}, pool: pool}
+	return Models{Courses: CourseModel{db: pool}, Learning: LearningModel{db: pool}, Users: UserModel{db: pool}, Tokens: TokenModel{db: pool, policy: policy}, pool: pool}
 }
 
 type TransactionMode bool
@@ -102,7 +104,7 @@ func (m Models) Transaction(ctx context.Context, mode TransactionMode, action fu
 			return err
 		}
 	}
-	err = action(Models{Learning: LearningModel{db: tx}, Users: UserModel{db: tx}, Tokens: TokenModel{db: tx, policy: m.Tokens.policy}})
+	err = action(Models{Courses: CourseModel{db: tx}, Learning: LearningModel{db: tx}, Users: UserModel{db: tx}, Tokens: TokenModel{db: tx, policy: m.Tokens.policy}})
 	var failedAttempt failedVerificationAttempt
 	if errors.As(err, &failedAttempt) {
 		// A rejected code must still consume an attempt. Verify before making other changes.
