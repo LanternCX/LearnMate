@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockLearning } from "./mock-learning";
 
 for (const stage of ["welcome", "question"] as const) {
   test(`onboarding ${stage} can be canceled or exited to login, never to the workspace`, async ({
@@ -21,6 +22,7 @@ for (const stage of ["welcome", "question"] as const) {
       completed: false,
       memory: "",
       memoryVersion: 0,
+      messageSequence: 0,
       revision: 0,
       status: stage === "welcome" ? "idle" : "waiting",
       leaseUntil: "",
@@ -34,16 +36,10 @@ for (const stage of ["welcome", "question"] as const) {
               options: ["编程", "AI"],
             },
     };
-    await page.route("**/api/learning", (route) =>
-      route.fulfill({ json: state }),
-    );
     await page.route("**/api/learning/model", (route) =>
       route.fulfill({ json: { available: false } }),
     );
-    await page.route("**/api/learning/sync", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      await route.fulfill({ json: state });
-    });
+    await mockLearning(page, () => state);
     let failLogout = true;
     await page.route("**/api/auth/logout", (route) =>
       route.fulfill(
@@ -99,23 +95,18 @@ test("mobile destinations show honest empty states and account pages can open th
     completed: true,
     memory: "喜欢动手尝试",
     memoryVersion: 1,
+    messageSequence: 0,
     revision: 0,
     status: "idle",
     leaseUntil: "",
     question: null,
   };
-  await page.route("**/api/learning", (route) =>
-    route.fulfill({ json: state }),
-  );
   await page.route("**/api/learning/model", (route) =>
     route.fulfill({ json: { available: false } }),
   );
-  await page.route("**/api/learning/sync", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    await route.fulfill({ json: state });
-  });
+  await mockLearning(page, () => state);
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await page.getByRole("button", { name: "自由探索" }).click();
   await expect(
     page.getByRole("heading", { name: "探索即将开放" }),
@@ -131,7 +122,7 @@ test("mobile destinations show honest empty states and account pages can open th
   );
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "返回学习", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
 });
 
 test("onboarding blocks navigation until completion, including reload and waiting", async ({
@@ -157,6 +148,7 @@ test("onboarding blocks navigation until completion, including reload and waitin
     completed,
     memory: "喜欢动手尝试",
     memoryVersion: 1,
+    messageSequence: 0,
     revision: completed ? 2 : waiting ? 1 : 0,
     status: waiting ? "running" : "waiting",
     leaseUntil: "2099-01-01T00:00:00Z",
@@ -170,22 +162,14 @@ test("onboarding blocks navigation until completion, including reload and waitin
             options: ["看个例子", "自己试试"],
           },
   });
-  await page.route("**/api/learning", (route) =>
-    route.fulfill({ json: state() }),
-  );
   await page.route("**/api/learning/model", (route) =>
     route.fulfill({ json: { available: false } }),
   );
-  await page.route("**/api/learning/sync", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    await route.fulfill({ json: state() });
-  });
-  await page.route("**/api/learning/action", (route) => {
+  const learning = await mockLearning(page, state, (action) => {
     attempts++;
-    if (attempts === 1)
-      return route.fulfill({ status: 503, json: { error: "暂时无法提交" } });
+    if (attempts === 1) throw new Error("暂时无法提交");
     waiting = true;
-    return route.fulfill({ json: state() });
+    return { state: state() };
   });
   await page.goto("/");
   await expect(
@@ -245,7 +229,8 @@ test("onboarding blocks navigation until completion, including reload and waitin
   await page.screenshot({ path: "test-results/onboarding-wait-dark.png" });
   completed = true;
   waiting = false;
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  learning.sync(state());
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await expect(page.getByRole("navigation", { name: "主导航" })).toBeVisible();
   await expect(page.getByRole("button", { name: "用户菜单" })).toBeVisible();
 });

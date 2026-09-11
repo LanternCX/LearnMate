@@ -2,9 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
@@ -39,61 +39,24 @@ type savedCall struct {
 
 const runLease = 45 * time.Second
 
-// Long polling works over the same authenticated HTTP bridge on web and desktop.
-// A request returns as soon as the persisted revision changes, including changes
-// written through another server instance.
-func (a *application) learningSync(w http.ResponseWriter, r *http.Request) {
-	var input struct {
-		Revision int `json:"revision"`
-	}
-	if err := a.readJSON(w, r, &input); err != nil {
-		a.respondError(w, err)
-		return
-	}
-	deadline := time.NewTimer(10 * time.Second)
-	defer deadline.Stop()
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
-	for {
-		var state data.Conversation
-		err := a.withUser(r, data.StandardTransaction, func(m data.Models, u data.User) error {
-			var err error
-			state, err = m.Learning.Load(r.Context(), u.ID)
-			return err
-		})
-		if err != nil {
-			a.respondError(w, err)
-			return
-		}
-		state.RunID = ""
-		if state.Revision != input.Revision {
-			writeJSON(w, 200, state)
-			return
-		}
-		select {
-		case <-r.Context().Done():
-			return
-		case <-deadline.C:
-			writeJSON(w, 200, state)
-			return
-		case <-ticker.C:
-		}
-	}
-}
-
-func (a *application) learningAction(w http.ResponseWriter, r *http.Request) {
-	var input learningAction
-	if err := a.readJSON(w, r, &input); err != nil {
-		a.respondError(w, err)
-		return
-	}
+func (a *application) applyLearningActionForUser(ctx context.Context, user string, input learningAction, requestID string) (data.Conversation, any, error) {
 	var state data.Conversation
 	var output any
-	err := a.withUser(r, data.StandardTransaction, func(m data.Models, u data.User) error {
+	var response any
+	err := a.models.Transaction(ctx, data.StandardTransaction, func(m data.Models) error {
 		var err error
-		state, err = m.Learning.Load(r.Context(), u.ID)
+		state, err = m.Learning.LoadForAction(ctx, user)
 		if err != nil {
 			return err
+		}
+		if requestID != "" {
+			cached, found, err := m.Learning.RequestResult(ctx, state.ID, requestID)
+			if err != nil {
+				return err
+			}
+			if found {
+				return json.Unmarshal(cached, &response)
+			}
 		}
 		switch input.Action {
 		case "claim":
@@ -252,18 +215,24 @@ func (a *application) learningAction(w http.ResponseWriter, r *http.Request) {
 				return bad("未知会话操作")
 			}
 		}
-		return m.Learning.Save(r.Context(), u.ID, &state)
+		if err := m.Learning.Save(ctx, user, &state); err != nil {
+			return err
+		}
+		response = output
+		if requestID != "" {
+			raw, err := json.Marshal(response)
+			if err != nil {
+				return err
+			}
+			return m.Learning.SaveRequestResult(ctx, state.ID, requestID, raw)
+		}
+		return nil
 	})
 	if err != nil {
-		a.respondError(w, err)
-		return
-	}
-	if output != nil {
-		writeJSON(w, 200, output)
-		return
+		return data.Conversation{}, nil, err
 	}
 	state.RunID = ""
-	writeJSON(w, 200, state)
+	return state, response, nil
 }
 
 func validateAnswer(q *data.Question, a *studentAnswer) error {
@@ -396,19 +365,4 @@ func executeLearningTool(c *data.Conversation, call savedCall) (any, error) {
 	default:
 		return nil, errors.New("未知工具")
 	}
-}
-
-func (a *application) learning(w http.ResponseWriter, r *http.Request) {
-	var state data.Conversation
-	err := a.withUser(r, data.StandardTransaction, func(m data.Models, u data.User) error {
-		var err error
-		state, err = m.Learning.Load(r.Context(), u.ID)
-		return err
-	})
-	if err != nil {
-		a.respondError(w, err)
-		return
-	}
-	state.RunID = ""
-	writeJSON(w, 200, state)
 }

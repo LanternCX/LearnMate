@@ -1,22 +1,28 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Checkbox } from "../components/ui/checkbox";
-import { api, APIError, type User } from "../api";
 import {
-  answerQuestion,
+  api,
+  APIError,
+  type ModelRetryStatus,
+  type User,
+} from "../api";
+import {
   correctionProgress,
   LearningSession,
-  loadConversation,
-  syncConversation,
   type Conversation,
   type ModelInfo,
   type Question,
   type AssistantOutput,
 } from "./session";
+import { ConversationChannel } from "./channel";
 import "./learning.css";
 import Mark from "../components/Mark";
 import Icon from "../components/Icon";
+import Course from "./CourseRoom";
+import type { StoredCourse } from "./courses";
 import { Spinner } from "../components/ui/spinner";
+import ConnectionRetry from "./ConnectionRetry";
 import {
   PromptInput,
   PromptInputFooter,
@@ -41,6 +47,7 @@ export default function Learning({
   ending,
   setEnding,
   onOnboardingChange,
+  courseLibrary,
   visible = true,
 }: {
   user: User;
@@ -50,12 +57,25 @@ export default function Learning({
   ending: boolean;
   setEnding: (value: boolean) => void;
   onOnboardingChange: (value: boolean) => void;
+  courseLibrary: {
+    courses: StoredCourse[];
+    activeCourse: StoredCourse | null;
+    coursesReady: boolean;
+    roomToken: number;
+    error: string;
+    onOpen: (course: StoredCourse) => void;
+    onRename: (course: StoredCourse, title: string) => Promise<boolean>;
+    onDelete: (course: StoredCourse) => Promise<boolean>;
+    onCourseCreated: (course: StoredCourse) => void;
+    onCourseUpdated: (course: StoredCourse) => void;
+  };
   visible?: boolean;
 }) {
   const [state, setState] = useState<Conversation | null>(null);
   const [info, setInfo] = useState<ModelInfo | null>(null);
   const [error, setError] = useState("");
   const [liveOutput, setLiveOutput] = useState<AssistantOutput | null>(null);
+  const [modelRetry, setModelRetry] = useState<ModelRetryStatus | null>(null);
   const memoryTitle = useRef<HTMLHeadingElement>(null);
   const [correction, setCorrection] = useState("");
   const [correcting, setCorrecting] = useState(false);
@@ -64,6 +84,7 @@ export default function Learning({
   const paused = useRef(false);
   const [introduced, setIntroduced] = useState(false);
   const session = useRef<LearningSession | null>(null);
+  const channel = useRef<ConversationChannel | null>(null);
   const generation = useRef(0);
   const latest = useRef<Conversation | null>(null);
   const alive = useRef(true);
@@ -80,15 +101,20 @@ export default function Learning({
     setState(next);
   };
   const run = async (model: ModelInfo, text?: string) => {
-    if (session.current || !alive.current) return false;
+    if (session.current || !channel.current || !alive.current) return false;
     const epoch = generation.current;
     const current = new LearningSession(
       model,
+      channel.current,
       (next) => {
         if (generation.current === epoch) receive(next);
       },
       (value) => {
         if (alive.current && generation.current === epoch) setLiveOutput(value);
+      },
+      (status) => {
+        if (alive.current && generation.current === epoch)
+          setModelRetry(status);
       },
     );
     session.current = current;
@@ -96,6 +122,7 @@ export default function Learning({
     setStopped(false);
     setRunning(true);
     setError("");
+    setModelRetry(null);
     setLiveOutput({ text: "", reasoning: "", isReasoning: false });
     try {
       await current.run(text);
@@ -111,7 +138,10 @@ export default function Learning({
       return false;
     } finally {
       if (session.current === current) session.current = null;
-      if (alive.current && generation.current === epoch) setRunning(false);
+      if (alive.current && generation.current === epoch) {
+        setRunning(false);
+        setModelRetry(null);
+      }
     }
   };
   const stopGenerating = () => {
@@ -125,9 +155,10 @@ export default function Learning({
     if (!ending) return;
     paused.current = true;
     session.current?.stop();
-    void api<Conversation>("/learning/action", "POST", {
-      action: "end_correction",
-    })
+    void channel.current
+      ?.action<Conversation>({
+        action: "end_correction",
+      })
       .then((next) => {
         if (!alive.current) return;
         receive(next);
@@ -160,10 +191,16 @@ export default function Learning({
     alive.current = true;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    const connection = new ConversationChannel();
+    channel.current = connection;
+    const unsubscribe = connection.subscribe((next) => {
+      if (disposed) return;
+      receive(next);
+    });
     const start = async () => {
       try {
         const [initial, model] = await Promise.all([
-          loadConversation(),
+          connection.open(),
           api<ModelInfo>("/learning/model"),
         ]);
         if (disposed) return;
@@ -173,28 +210,21 @@ export default function Learning({
           !correctionProgress(initial)?.saved
         ) {
           receive(
-            await api<Conversation>("/learning/action", "POST", {
+            await connection.action<Conversation>({
               action: "end_correction",
             }),
           );
         }
         setInfo(model);
-        while (!disposed) {
-          const next = await syncConversation(
-            latest.current?.revision ?? initial.revision,
-          );
-          if (disposed) return;
-          receive(next);
-          if (
-            model.available &&
-            !next.completed &&
-            !paused.current &&
-            !session.current &&
-            next.status === "running" &&
-            Date.parse(next.leaseUntil) < Date.now()
-          )
-            void run(model);
-        }
+        if (
+          model.available &&
+          !initial.completed &&
+          !paused.current &&
+          !session.current &&
+          initial.status === "running" &&
+          Date.parse(initial.leaseUntil) < Date.now()
+        )
+          void run(model);
       } catch (e) {
         if (disposed) return;
         setError(e instanceof Error ? e.message : "暂时无法同步，请重试");
@@ -207,8 +237,11 @@ export default function Learning({
       generation.current++;
       alive.current = false;
       clearTimeout(retry);
+      unsubscribe();
       session.current?.stop();
       session.current = null;
+      connection.close();
+      if (channel.current === connection) channel.current = null;
     };
   }, [user.id]);
   const active =
@@ -257,13 +290,20 @@ export default function Learning({
       ) : (
         <>
           {state.completed && !memoryOpen && (
-            <div className="workspace-empty">
-              <div className="subject-art learning">
-                <Icon name="learning" />
-              </div>
-              <h1>课程准备中</h1>
-              <p>初次交流已完成</p>
-            </div>
+            <Course
+              info={info}
+              memory={state.memory}
+              courses={courseLibrary.courses}
+              activeCourse={courseLibrary.activeCourse}
+              coursesReady={courseLibrary.coursesReady}
+              roomToken={courseLibrary.roomToken}
+              libraryError={courseLibrary.error}
+              onOpenCourse={courseLibrary.onOpen}
+              onRenameCourse={courseLibrary.onRename}
+              onDeleteCourse={courseLibrary.onDelete}
+              onCourseCreated={courseLibrary.onCourseCreated}
+              onCourseUpdated={courseLibrary.onCourseUpdated}
+            />
           )}
           <div hidden={state.completed && (!memoryOpen || editing)}>
             {!introduced &&
@@ -311,9 +351,13 @@ export default function Learning({
                         (!state.completed || (memoryOpen && !editing))
                       }
                       submit={async (answer) => {
-                        const next = await answerQuestion(
-                          state.question!.id,
-                          answer,
+                        if (!channel.current) throw new Error("会话尚未连接");
+                        const next = await channel.current.action<Conversation>(
+                          {
+                            action: "answer",
+                            toolCallId: state.question!.id,
+                            answer,
+                          },
                         );
                         receive(next);
                         setLiveOutput(null);
@@ -337,6 +381,7 @@ export default function Learning({
                         stopped={stopped}
                       />
                     </Suspense>
+                    <ConnectionRetry status={modelRetry} />
                     {!state.completed && active && running && (
                       <div
                         className={`learning-progress-controls ${!output.reasoning ? "is-waiting" : ""}`}

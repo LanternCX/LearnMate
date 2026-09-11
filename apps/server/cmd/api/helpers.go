@@ -24,6 +24,13 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 func (a *application) respondError(w http.ResponseWriter, err error) {
+	status, message := errorResponse(err)
+	if status == 429 {
+		w.Header().Set("Retry-After", strconv.Itoa(a.config.Account.RateWindowSeconds))
+	}
+	writeJSON(w, status, map[string]string{"error": message})
+}
+func errorResponse(err error) (int, string) {
 	var e failure
 	var validation data.ValidationError
 	switch {
@@ -38,14 +45,15 @@ func (a *application) respondError(w http.ResponseWriter, err error) {
 		e = failure{409, err.Error()}
 	case errors.Is(err, data.ErrRateLimited):
 		e = failure{429, err.Error()}
+	case errors.Is(err, data.ErrCourseNotFound):
+		e = failure{404, "未找到课程"}
+	case errors.Is(err, data.ErrConversationBusy):
+		e = failure{409, err.Error()}
 	default:
-		log.Printf("account operation failed: %T", err)
+		log.Printf("request failed: %T", err)
 		e = failure{500, "服务暂时不可用，请稍后重试"}
 	}
-	if e.status == 429 {
-		w.Header().Set("Retry-After", strconv.Itoa(a.config.Account.RateWindowSeconds))
-	}
-	writeJSON(w, e.status, map[string]string{"error": e.message})
+	return e.status, e.message
 }
 func (a *application) readJSON(w http.ResponseWriter, r *http.Request, value any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, int64(a.config.Server.MaxBodyBytes))

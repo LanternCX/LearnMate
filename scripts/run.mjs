@@ -41,10 +41,14 @@ if (["server", "check-server-config", "test-accounts"].includes(command)) {
         executable = "cargo";
         args = ["test", "--manifest-path", "apps/client/src-tauri/Cargo.toml", ...extra];
       } else {
+        const websocketOrigin = config.api_origin.replace(/^http/, "ws");
         executable = "npm";
         args = ["run", "tauri", "--workspace", "@zhiya/client", "--",
           command === "desktop-dev" ? "dev" : "build",
-          "--config", JSON.stringify({ build: { devUrl: config.dev_origin } }),
+          "--config", JSON.stringify({
+            build: { devUrl: config.dev_origin },
+            app: { security: { csp: `default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost ${websocketOrigin}` } },
+          }),
           ...(command === "desktop-build" ? ["--no-bundle"] : []), ...extra];
       }
       break;

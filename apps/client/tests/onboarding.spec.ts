@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockLearning } from "./mock-learning";
 import { readFileSync } from "node:fs";
 import { parseEnv } from "node:util";
 import { resolve } from "node:path";
@@ -249,24 +250,17 @@ test("Pi resumes a persisted question across devices and saves memory before com
   ).toBeVisible();
   await other.getByRole("radio", { name: "用过", exact: true }).check();
   await other.getByRole("button", { name: "提交回答", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible({
     timeout: 15000,
   });
   await expect(
-    other.getByRole("heading", { name: "课程准备中" }),
+    other.getByRole("heading", { name: "今天想学什么？" }),
   ).toBeVisible();
   await other.getByRole("button", { name: "用户菜单" }).click();
   await other.getByRole("button", { name: "学习档案", exact: true }).click();
   await expect(
     other.getByText("学生自述用过 Scratch。", { exact: true }),
   ).toBeVisible();
-  const saved = await (await context.request.get("/api/learning")).json();
-  expect(
-    saved.messages.filter(
-      (m: { role: string; toolCallId: string }) =>
-        m.role === "toolResult" && m.toolCallId === "q-first",
-    ),
-  ).toHaveLength(1);
   const editor = other.getByRole("region", { name: "学习档案" });
   await editor
     .getByRole("textbox", { name: "修改或忘记" })
@@ -358,6 +352,7 @@ test("a student answers one concrete question and sees the overview when the age
     completed,
     memory: "喜欢先看一个例子，再自己试试。",
     memoryVersion: 1,
+    messageSequence: 0,
     revision: completed ? 1 : 0,
     status: completed ? "idle" : "waiting",
     leaseUntil: "2099-01-01T00:00:00Z",
@@ -380,22 +375,16 @@ test("a student answers one concrete question and sees the overview when the age
       },
     }),
   );
-  await page.route("**/api/learning", (route) =>
-    route.fulfill({ json: state() }),
-  );
   await page.route("**/api/learning/model", (route) =>
     route.fulfill({ json: { id: "test", available: false } }),
   );
-  await page.route("**/api/learning/sync", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    await route.fulfill({ json: state() });
-  });
-  await page.route("**/api/learning/action", async (route) => {
-    const body = route.request().postDataJSON();
-    expect(body.action).toBe("answer");
-    expect(body.answer.selected).toEqual(["看一个例子"]);
+  await mockLearning(page, state, (action) => {
+    expect(action.action).toBe("answer");
+    expect((action.answer as { selected: string[] }).selected).toEqual([
+      "看一个例子",
+    ]);
     completed = true;
-    await route.fulfill({ json: state() });
+    return { state: state() };
   });
   await page.goto("/");
   await expect(
@@ -406,7 +395,7 @@ test("a student answers one concrete question and sees the overview when the age
   ).toBeDisabled();
   await page.getByRole("radio", { name: "看一个例子" }).check();
   await page.getByRole("button", { name: "提交回答", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "课程准备中" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
   await page.getByRole("button", { name: "用户菜单" }).click();
   await page.getByRole("button", { name: "学习档案", exact: true }).click();
   await expect(

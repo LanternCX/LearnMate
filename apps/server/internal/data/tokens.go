@@ -15,6 +15,7 @@ import (
 )
 
 const VerificationTTL = 10 * time.Minute
+const socketTicketTTL = 30 * time.Second
 const verificationCodeDigits = 8
 
 type TokenModel struct {
@@ -88,6 +89,29 @@ func (m TokenModel) NewSession(ctx context.Context, id string) (string, error) {
 	_, err := m.db.Exec(ctx, "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES($1,$2,clock_timestamp()+$3*interval '1 second')", digest(token), id, m.policy.SessionTTLSeconds)
 	return token, err
 }
+func (m TokenModel) NewSocketTicket(ctx context.Context, session, user string) (string, error) {
+	ticket := randomToken()
+	result, err := m.db.Exec(ctx, `INSERT INTO socket_tickets(token_hash,session_hash,user_id,expires_at)
+ SELECT $1,$2,$3,clock_timestamp()+$4*interval '1 second' FROM sessions
+ WHERE token_hash=$2 AND user_id=$3 AND expires_at>now()`, digest(ticket), digest(session), user, int(socketTicketTTL.Seconds()))
+	if err != nil {
+		return "", err
+	}
+	if result.RowsAffected() != 1 {
+		return "", ErrInvalidSession
+	}
+	return ticket, nil
+}
+func (m TokenModel) ConsumeSocketTicket(ctx context.Context, ticket string) (string, error) {
+	var user string
+	err := m.db.QueryRow(ctx, `DELETE FROM socket_tickets t USING sessions s
+ WHERE t.token_hash=$1 AND t.session_hash=s.token_hash AND t.user_id=s.user_id
+ AND t.expires_at>now() AND s.expires_at>now() RETURNING t.user_id`, digest(ticket)).Scan(&user)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrInvalidSession
+	}
+	return user, err
+}
 func (m TokenModel) DeleteSession(ctx context.Context, token string) error {
 	_, err := m.db.Exec(ctx, "DELETE FROM sessions WHERE token_hash=$1", digest(token))
 	return err
@@ -112,7 +136,7 @@ func (m TokenModel) DeleteEmailChallenges(ctx context.Context, id, email, newEma
 	return err
 }
 func (m TokenModel) CleanupExpired(ctx context.Context) error {
-	_, err := m.db.Exec(ctx, "DELETE FROM challenges WHERE expires_at<now(); DELETE FROM sessions WHERE expires_at<now(); DELETE FROM auth_limits WHERE expires_at<now()")
+	_, err := m.db.Exec(ctx, "DELETE FROM challenges WHERE expires_at<now(); DELETE FROM socket_tickets WHERE expires_at<now(); DELETE FROM sessions WHERE expires_at<now(); DELETE FROM auth_limits WHERE expires_at<now(); DELETE FROM conversation_requests WHERE created_at<now()-interval '1 day'")
 	return err
 }
 func (m TokenModel) Limit(ctx context.Context, key string, max int) error {

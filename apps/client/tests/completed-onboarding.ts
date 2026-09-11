@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { mockLearning } from "./mock-learning";
 
 // Account tests start after onboarding; its completion is tested separately.
 export async function completedOnboarding(page: Page) {
@@ -9,21 +10,16 @@ export async function completedOnboarding(page: Page) {
     completed: true,
     memory: "",
     memoryVersion: 0,
+    messageSequence: 0,
     revision: 0,
     status: "idle",
     leaseUntil: "",
     question: null,
   };
-  await page
-    .context()
-    .route("**/api/learning", (route) => route.fulfill({ json: state }));
+  await mockLearning(page.context(), () => state);
   await page
     .context()
     .route("**/api/learning/model", (route) =>
       route.fulfill({ json: { available: false } }),
     );
-  await page.context().route("**/api/learning/sync", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    await route.fulfill({ json: state });
-  });
 }

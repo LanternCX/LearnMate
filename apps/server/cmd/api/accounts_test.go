@@ -27,6 +27,8 @@ type testApp struct {
 	t      *testing.T
 	server *httptest.Server
 	mail   map[string]string
+	db     *pgxpool.Pool
+	config config.Config
 }
 
 func setupAccountTest(t *testing.T) *testApp {
@@ -66,11 +68,30 @@ func setupAccountTest(t *testing.T) *testApp {
 	if err := data.NewModels(db, settings.Account).Initialize(ctx); err != nil {
 		t.Fatal(err)
 	}
-	a := &testApp{t: t, mail: make(map[string]string)}
-	app := &application{config: settings, models: data.NewModels(db, settings.Account), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }}
+	a := &testApp{t: t, mail: make(map[string]string), db: db, config: settings}
+	app := &application{config: settings, models: data.NewModels(db, settings.Account), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }, learningHub: newLearningHub()}
+	listenerContext, stopListener := context.WithCancel(context.Background())
+	t.Cleanup(stopListener)
+	if err := app.startLearningEvents(listenerContext); err != nil {
+		t.Fatal(err)
+	}
 	a.server = httptest.NewServer(app.routes())
 	t.Cleanup(a.server.Close)
 	return a
+}
+
+func (a *testApp) anotherInstance() *testApp {
+	a.t.Helper()
+	other := &testApp{t: a.t, mail: a.mail, db: a.db, config: a.config}
+	app := &application{config: a.config, models: data.NewModels(a.db, a.config.Account), send: func(to, purpose, code string) error { a.mail[to+":"+purpose] = code; return nil }, learningHub: newLearningHub()}
+	listenerContext, stopListener := context.WithCancel(context.Background())
+	a.t.Cleanup(stopListener)
+	if err := app.startLearningEvents(listenerContext); err != nil {
+		a.t.Fatal(err)
+	}
+	other.server = httptest.NewServer(app.routes())
+	a.t.Cleanup(other.server.Close)
+	return other
 }
 
 func (a *testApp) client() *http.Client {
@@ -80,6 +101,9 @@ func (a *testApp) client() *http.Client {
 
 func (a *testApp) request(c *http.Client, method, path string, body any, status int) map[string]any {
 	a.t.Helper()
+	if path == "/learning" || path == "/learning/action" {
+		return a.learningRequest(c, method, path, body, status)
+	}
 	data, _ := json.Marshal(body)
 	req, _ := http.NewRequest(method, a.server.URL+"/api"+path, bytes.NewReader(data))
 	req.Header.Set("Content-Type", "application/json")

@@ -43,7 +43,7 @@ func (a *application) protect(next http.Handler) http.Handler {
 					return
 				}
 			}
-			if strings.HasPrefix(r.URL.Path, "/api/auth/") || (r.Method != "GET" && r.URL.Path != "/api/learning/sync") {
+			if strings.HasPrefix(r.URL.Path, "/api/auth/") || r.Method != "GET" {
 				ip, _, _ := net.SplitHostPort(r.RemoteAddr)
 				if err := a.models.Tokens.Limit(r.Context(), "ip:"+ip, a.config.Account.IPLimit); err != nil {
 					a.respondError(w, err)

@@ -15,7 +15,10 @@ test("client settings do not depend on backend configuration or credentials", ()
     dev_origin: "http://127.0.0.1:11420",
     request_timeout_seconds: 42,
   });
-  assert.deepEqual(publicBuildConfig(config), { requestTimeoutMilliseconds: 42000 });
+  assert.deepEqual(publicBuildConfig(config), {
+    apiOrigin: "https://api.example.com",
+    requestTimeoutMilliseconds: 42000,
+  });
 });
 
 test("client build rejects malformed settings", () => {
