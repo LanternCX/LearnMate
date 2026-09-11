@@ -1,7 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Checkbox } from "../components/ui/checkbox";
-import { api, APIError, type User } from "../api";
+import {
+  api,
+  APIError,
+  type ModelRetryStatus,
+  type User,
+} from "../api";
 import {
   correctionProgress,
   LearningSession,
@@ -17,6 +22,7 @@ import Icon from "../components/Icon";
 import Course from "./CourseRoom";
 import type { StoredCourse } from "./courses";
 import { Spinner } from "../components/ui/spinner";
+import ConnectionRetry from "./ConnectionRetry";
 import {
   PromptInput,
   PromptInputFooter,
@@ -69,6 +75,7 @@ export default function Learning({
   const [info, setInfo] = useState<ModelInfo | null>(null);
   const [error, setError] = useState("");
   const [liveOutput, setLiveOutput] = useState<AssistantOutput | null>(null);
+  const [modelRetry, setModelRetry] = useState<ModelRetryStatus | null>(null);
   const memoryTitle = useRef<HTMLHeadingElement>(null);
   const [correction, setCorrection] = useState("");
   const [correcting, setCorrecting] = useState(false);
@@ -105,12 +112,17 @@ export default function Learning({
       (value) => {
         if (alive.current && generation.current === epoch) setLiveOutput(value);
       },
+      (status) => {
+        if (alive.current && generation.current === epoch)
+          setModelRetry(status);
+      },
     );
     session.current = current;
     paused.current = false;
     setStopped(false);
     setRunning(true);
     setError("");
+    setModelRetry(null);
     setLiveOutput({ text: "", reasoning: "", isReasoning: false });
     try {
       await current.run(text);
@@ -126,7 +138,10 @@ export default function Learning({
       return false;
     } finally {
       if (session.current === current) session.current = null;
-      if (alive.current && generation.current === epoch) setRunning(false);
+      if (alive.current && generation.current === epoch) {
+        setRunning(false);
+        setModelRetry(null);
+      }
     }
   };
   const stopGenerating = () => {
@@ -366,6 +381,7 @@ export default function Learning({
                         stopped={stopped}
                       />
                     </Suspense>
+                    <ConnectionRetry status={modelRetry} />
                     {!state.completed && active && running && (
                       <div
                         className={`learning-progress-controls ${!output.reasoning ? "is-waiting" : ""}`}

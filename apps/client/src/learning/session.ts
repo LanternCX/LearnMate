@@ -10,7 +10,10 @@ import type {
 } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
 import { Type } from "typebox";
-import { modelRequest } from "../api";
+import {
+  modelRequest,
+  type ModelRetryListener,
+} from "../api";
 import { ConversationChannel } from "./channel";
 
 export type Question = {
@@ -41,6 +44,16 @@ export type AssistantOutput = {
   reasoning: string;
   isReasoning: boolean;
 };
+
+const maxInterruptedTurnRetries = 5;
+
+function interruptedAssistant(message: AgentMessage | undefined) {
+  return (
+    message?.role === "assistant" &&
+    message.stopReason === "error" &&
+    message.errorMessage?.includes("模型连接中断，请重试")
+  );
+}
 
 // Derive correction progress from acknowledged tools, not generated prose.
 // Keeping this in the transcript also lets another device resume the same flow.
@@ -77,11 +90,13 @@ export class LearningSession {
   private agent: Agent | null = null;
   private stopped = false;
   private runId = "";
+  private cancelRetryWait: (() => void) | null = null;
   constructor(
     private info: ModelInfo,
     private channel: ConversationChannel,
     private update: (state: Conversation) => void,
     private output: (value: AssistantOutput) => void,
+    private onRetry: ModelRetryListener,
   ) {}
   get isStopped() {
     return this.stopped;
@@ -89,6 +104,7 @@ export class LearningSession {
   stop() {
     if (this.stopped) return;
     this.stopped = true;
+    this.cancelRetryWait?.();
     this.agent?.abort();
     if (this.runId)
       void this.channel
@@ -97,6 +113,35 @@ export class LearningSession {
           runId: this.runId,
         })
         .catch(() => {});
+  }
+  private waitBeforeRetry(attempt: number) {
+    return new Promise<void>((resolve) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (this.cancelRetryWait === finish) this.cancelRetryWait = null;
+        resolve();
+      };
+      const timer = setTimeout(
+        finish,
+        Math.min(500 * 2 ** (attempt - 1), 8000),
+      );
+      this.cancelRetryWait = finish;
+    });
+  }
+  private async recoverInterruptedTurn(agent: Agent) {
+    for (let attempt = 1; attempt <= maxInterruptedTurnRetries; attempt++) {
+      const failed = agent.state.messages.at(-1);
+      if (!interruptedAssistant(failed)) return;
+      agent.state.messages = agent.state.messages.slice(0, -1);
+      this.output({ text: "", reasoning: "", isReasoning: false });
+      this.onRetry({ attempt, maxRetries: maxInterruptedTurnRetries });
+      await this.waitBeforeRetry(attempt);
+      if (this.stopped) return;
+      await agent.continue();
+    }
   }
   private async action<T>(action: string, extra: object = {}): Promise<T> {
     if (this.stopped) throw new Error("会话已离开");
@@ -286,6 +331,7 @@ export class LearningSession {
                   this.runId,
                   payload,
                   init?.signal ?? undefined,
+                  this.onRetry,
                 );
               },
             },
@@ -350,11 +396,14 @@ export class LearningSession {
         await agent.prompt("请开始认识我，帮助我找到适合自己的学习方式。");
       else if (agent.state.messages.at(-1)?.role !== "assistant")
         await agent.continue();
+      await this.recoverInterruptedTurn(agent);
+      this.onRetry(null);
       if (agent.state.errorMessage)
         throw new Error("交流暂时中断了，你的回答已保存，请重试。");
       if (correcting && !correctionProgress(state)?.saved)
         throw new Error("档案修改尚未完成，请继续交流。你的已提交回答已保留。");
     } finally {
+      this.onRetry(null);
       clearInterval(heartbeat);
       // Release only this execution; a replacement run's token cannot be affected.
       await this.channel

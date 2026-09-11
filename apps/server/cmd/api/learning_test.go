@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -302,6 +303,13 @@ func TestModelProxyUsesServerCredentialsAndRequiresExecution(t *testing.T) {
 	c := a.register("proxy@example.com")
 	a.request(c, "POST", "/learning/model", map[string]any{"runId": "invalid", "payload": map[string]any{}}, 409)
 	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, 200)["runId"].(string)
+	a.request(c, "POST", "/learning/action", map[string]any{
+		"action": "message",
+		"runId":  run,
+		"message": map[string]any{
+			"role": "user", "content": []any{map[string]string{"type": "text", "text": "请开始认识我"}}, "timestamp": time.Now().UnixMilli(),
+		},
+	}, http.StatusOK)
 	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"model": "client-model", "messages": []any{}, "stream": true}})
 	req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", strings.NewReader(string(body)))
 	req.Header.Set("Content-Type", "application/json")
@@ -314,6 +322,190 @@ func TestModelProxyUsesServerCredentialsAndRequiresExecution(t *testing.T) {
 	raw, _ := io.ReadAll(res.Body)
 	if res.StatusCode != 200 || string(raw) != "data: [DONE]\n\n" {
 		t.Fatalf("proxy: %d %s", res.StatusCode, raw)
+	}
+	state := a.request(c, "GET", "/learning", nil, http.StatusOK)
+	if state["status"] != "running" || state["inference"] != false {
+		t.Fatalf("completed model stream released execution: %v", state)
+	}
+	a.request(c, "POST", "/learning/action", map[string]any{
+		"action": "message",
+		"runId":  run,
+		"message": toolMessage("next-question", "ask_student", map[string]any{
+			"text": "你喜欢怎样学习？", "kind": "text", "options": []string{},
+		}),
+	}, http.StatusOK)
+}
+
+func TestModelProxyRetriesTransientUpstreamFailures(t *testing.T) {
+	attempts := 0
+	idempotencyKey := ""
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			idempotencyKey = r.Header.Get("Idempotency-Key")
+		} else if r.Header.Get("Idempotency-Key") != idempotencyKey {
+			t.Errorf("idempotency key changed between attempts")
+		}
+		if attempts < 3 {
+			w.Header().Set("Retry-After", "0")
+			http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: [DONE]\n\n")
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "retry-model")
+	t.Setenv("ZHIYA_SERVER_MODEL_API_KEY", "server-secret")
+	a := setupAccountTest(t)
+	c := a.register("proxy-retry@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK || !strings.HasSuffix(string(raw), "data: [DONE]\n\n") {
+		t.Fatalf("proxy: %d %s", res.StatusCode, raw)
+	}
+	if attempts != 3 {
+		t.Fatalf("upstream attempts = %d; want 3", attempts)
+	}
+	if idempotencyKey == "" {
+		t.Fatal("missing upstream idempotency key")
+	}
+}
+
+func TestModelProxyStopsAfterFiveRetriesAndReleasesExecution(t *testing.T) {
+	attempts := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.Header().Set("Retry-After", "0")
+		http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "retry-model")
+	a := setupAccountTest(t)
+	c := a.register("proxy-retry-exhausted@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if attempts != 6 {
+		t.Fatalf("upstream attempts = %d; want initial request plus 5 retries", attempts)
+	}
+	if strings.Count(string(raw), ": zhiya-retry ") != 5 || !strings.Contains(string(raw), "upstream_connection_error") {
+		t.Fatalf("retry stream = %s", raw)
+	}
+	if next := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string); next == "" || next == run {
+		t.Fatalf("new execution was not released: previous=%q next=%q", run, next)
+	}
+}
+
+func TestModelProxyDoesNotReplayAnInterruptedPartialStream(t *testing.T) {
+	attempts := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"已经收到的内容\"}}]}\n\n")
+		if flusher, ok := w.(http.Flusher); ok {
+			flusher.Flush()
+		}
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "partial-model")
+	a := setupAccountTest(t)
+	c := a.register("proxy-partial@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	if attempts != 1 || strings.Contains(string(raw), ": zhiya-retry ") {
+		t.Fatalf("partial stream was replayed: attempts=%d body=%s", attempts, raw)
+	}
+	if !strings.Contains(string(raw), "已经收到的内容") || !strings.Contains(string(raw), "upstream_connection_error") {
+		t.Fatalf("partial stream did not end with an explicit interruption: %s", raw)
+	}
+}
+
+func TestModelProxyDoesNotRetryPermanentUpstreamErrors(t *testing.T) {
+	attempts := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		http.Error(w, "invalid request", http.StatusBadRequest)
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "invalid-model")
+	a := setupAccountTest(t)
+	c := a.register("proxy-permanent-error@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string)
+	result := a.request(c, "POST", "/learning/model", map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}}, http.StatusBadGateway)
+	if attempts != 1 {
+		t.Fatalf("permanent error attempts = %d; want 1", attempts)
+	}
+	if result["error"] != "模型服务暂时不可用，请稍后重试" {
+		t.Fatalf("error = %v", result)
+	}
+}
+
+func TestModelProxyStopsRetryingWhenTheClientCancels(t *testing.T) {
+	attempts := 0
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
+		w.Header().Set("Retry-After", "60")
+		http.Error(w, "temporarily unavailable", http.StatusServiceUnavailable)
+	}))
+	defer upstream.Close()
+	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
+	t.Setenv("ZHIYA_SERVER_MODEL_ID", "cancelled-model")
+	a := setupAccountTest(t)
+	c := a.register("proxy-cancelled@example.com")
+	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	ctx, cancel := context.WithCancel(context.Background())
+	req, _ := http.NewRequestWithContext(ctx, "POST", a.server.URL+"/api/learning/model", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewReader(res.Body)
+	line, err := reader.ReadString('\n')
+	if err != nil || !strings.HasPrefix(line, ": zhiya-retry ") {
+		t.Fatalf("first retry notification = %q, %v", line, err)
+	}
+	cancel()
+	_, _ = io.ReadAll(reader)
+	_ = res.Body.Close()
+	if attempts != 1 {
+		t.Fatalf("cancelled request attempts = %d; want 1", attempts)
+	}
+	if next := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, http.StatusOK)["runId"].(string); next == "" || next == run {
+		t.Fatalf("cancelled execution was not released: previous=%q next=%q", run, next)
 	}
 }
 
@@ -549,9 +741,11 @@ func TestEndingCorrectionCancelsUpstreamGenerationAcrossInstances(t *testing.T) 
 }
 
 func TestInterruptedModelStreamReleasesExecution(t *testing.T) {
+	attempts := 0
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts++
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
 	}))
 	defer upstream.Close()
 	t.Setenv("ZHIYA_SERVER_MODEL_ENDPOINT", upstream.URL)
@@ -559,7 +753,19 @@ func TestInterruptedModelStreamReleasesExecution(t *testing.T) {
 	a := setupAccountTest(t)
 	c := a.register("interrupted-model@example.com")
 	run := a.request(c, "POST", "/learning/action", map[string]any{"action": "claim"}, 200)["runId"].(string)
-	a.request(c, "POST", "/learning/model", map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}}, 200)
+	body, _ := json.Marshal(map[string]any{"runId": run, "payload": map[string]any{"messages": []any{}}})
+	req, _ := http.NewRequest("POST", a.server.URL+"/api/learning/model", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Zhiya-Request", "1")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = io.Copy(io.Discard, res.Body)
+	_ = res.Body.Close()
+	if attempts != 1 {
+		t.Fatalf("partial stream attempts = %d; want no replay", attempts)
+	}
 	state := a.request(c, "GET", "/learning", nil, 200)
 	if state["status"] != "idle" || state["inference"] != false {
 		t.Fatalf("interrupted stream retained execution: %v", state)

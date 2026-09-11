@@ -6,7 +6,11 @@ import {
 import type { AssistantMessage, Model } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
 import { Type } from "typebox";
-import { courseModelRequest } from "../api";
+import {
+  courseModelRequest,
+  type ModelRetryListener,
+  type ModelRetryStatus,
+} from "../api";
 import type { ModelInfo } from "./session";
 import type {
   CourseConversationState,
@@ -69,7 +73,10 @@ const modelFor = (info: ModelInfo): Model<"openai-completions"> => ({
   maxTokens: 8192,
 });
 
-const streamFor = (agent: "teacher" | "slides"): StreamFn =>
+const streamFor = (
+  agent: "teacher" | "slides",
+  onRetry: ModelRetryListener,
+): StreamFn =>
   (model, context, options) =>
     streamSimple(model as Model<"openai-completions">, context, {
       ...options,
@@ -78,7 +85,12 @@ const streamFor = (agent: "teacher" | "slides"): StreamFn =>
       fetch: async (_url, init) => {
         const payload = JSON.parse(String(init?.body));
         payload.parallel_tool_calls = false;
-        return courseModelRequest(agent, payload, init?.signal ?? undefined);
+        return courseModelRequest(
+          agent,
+          payload,
+          init?.signal ?? undefined,
+          onRetry,
+        );
       },
     });
 
@@ -108,6 +120,7 @@ export class CourseSession {
   private courseId = "";
   private courseTitle = "";
   private courseTopic = "";
+  private modelRetries = new Map<"teacher" | "slides", ModelRetryStatus>();
 
   constructor(
     info: ModelInfo,
@@ -116,6 +129,7 @@ export class CourseSession {
     private onSlides: (slides: Slide[], generating: boolean) => void,
     private onPresent: (slideId: string) => void,
     private onActivity: (activity: CourseActivity | null) => void,
+    private onRetry: ModelRetryListener,
     private onError: (message: string) => void,
     initial: CourseConversationState,
     private courseManagement: CourseManagement,
@@ -306,10 +320,12 @@ export class CourseSession {
         model: modelFor(info),
         messages: [],
         tools: [createCourse, renameCourse, createSlides, showNextSlide, readSlides, cancelSlides],
-        systemPrompt: `You are Zhiya, a K12 learning companion and the sole controller of lesson playback. ${this.courseId ? `Continue the active course ${JSON.stringify({ title: this.courseTitle, topic: this.courseTopic })}.` : "Before teaching, you MUST call create_course exactly once using the student's first learning request. You decide the concise course title, stable topic, and an editorial cover direction; do not ask for confirmation. Choose a motif that genuinely matches the subject, vary palettes between courses, and write a compact subject label such as COMPUTING · 01 rather than repeating the title."} Start teaching immediately from whatever learning context the student provides. Decide the plan, pace, and page count yourself. Use create_slides to prepare visual pages in the background. Its first returned page is visible. Stream one concise Markdown explanation for that page, then call show_next_slide only after that explanation is complete. Explain the newly visible page, then repeat this explanation → show_next_slide cycle. Never advance while explaining and never describe a page that is merely generated but not visible. Do not require outline confirmation. When feedback changes unfinished material, replace it; ordinary questions may leave preparation running. Speak the student's language.\nPrevious course transcript:\n${JSON.stringify(initial.messages.map(({ role, text }) => ({ role, text })))}\nStudent learning memory:\n${memory || "No saved preferences yet."}`,
+        systemPrompt: `You are Zhiya, a K12 learning companion and the sole controller of lesson playback. ${this.courseId ? `Continue the active course ${JSON.stringify({ title: this.courseTitle, topic: this.courseTopic })}.` : "Before teaching, you MUST call create_course exactly once using the student's first learning request. You decide the concise course title, stable topic, and an editorial cover direction; do not ask for confirmation. Choose a motif that genuinely matches the subject, vary palettes between courses, and write a compact subject label such as COMPUTING · 01 rather than repeating the title."} Start teaching immediately from whatever learning context the student provides. The student's explicit request for lesson pace and page count takes priority. Generate the number of pages the student requests; when no count is given, choose an appropriate batch from the current request and learning memory. Use create_slides to prepare those visual pages in the background. Its first returned page is visible. Keep playback and narration synchronized: show one page, explain that page with concise Markdown, and only then call show_next_slide. If the student asks for continuous teaching, repeat this cycle and do not wait for confirmation until the requested batch is complete or the student interrupts. If the student asks for one page at a time, explain the current page and wait for the student before advancing. Never advance while explaining, describe a page that is merely generated but not visible, or promise to continue without actually calling show_next_slide when another requested page remains. Do not require outline confirmation. When feedback changes unfinished material, replace it; ordinary questions may leave preparation running. Speak the student's language.\nPrevious course transcript:\n${JSON.stringify(initial.messages.map(({ role, text }) => ({ role, text })))}\nStudent learning memory:\n${memory || "No saved preferences yet."}`,
       },
       toolExecution: "sequential",
-      streamFn: streamFor("teacher"),
+      streamFn: streamFor("teacher", (status) =>
+        this.updateModelRetry("teacher", status),
+      ),
     });
     this.teacher.subscribe((event) => {
       if (this.stopped) return;
@@ -408,6 +424,8 @@ export class CourseSession {
     this.narrationPlayback?.resolve();
     this.narrationPlayback = null;
     this.onActivity(null);
+    this.modelRetries.clear();
+    this.onRetry(null);
   }
 
   stop() {
@@ -438,6 +456,18 @@ export class CourseSession {
         cancel_slides: "调整后续内容",
       }[name] ?? "使用教学工具"
     );
+  }
+
+  private updateModelRetry(
+    agent: "teacher" | "slides",
+    status: ModelRetryStatus | null,
+  ) {
+    if (status) this.modelRetries.set(agent, status);
+    else this.modelRetries.delete(agent);
+    const active = [...this.modelRetries.values()].sort(
+      (a, b) => b.attempt - a.attempt,
+    )[0];
+    this.onRetry(active ?? null);
   }
 
   private ensureNarrationPlayback(id: number) {
@@ -580,7 +610,9 @@ export class CourseSession {
         systemPrompt: `You create clear K12 presentation pages for a live lesson. Publish pages one at a time with publish_slide so the first page appears quickly. Create exactly the requested number unless the task is cancelled. The client draws each page as a trusted SVG scene from the structured tool fields. Supply concise plain text only: never put Markdown, HTML, or SVG markup in title, kicker, body, or bullets. Each page must stand on its own and stay faithful to the goal. Do not emit prose outside tool calls.\nStudent memory:\n${memory || "No saved preferences yet."}`,
       },
       toolExecution: "sequential",
-      streamFn: streamFor("slides"),
+      streamFn: streamFor("slides", (status) =>
+        this.updateModelRetry("slides", status),
+      ),
     });
     this.slideAgent = agent;
     void agent

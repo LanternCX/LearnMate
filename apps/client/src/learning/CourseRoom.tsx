@@ -18,6 +18,8 @@ import { Spinner } from "../components/ui/spinner";
 import SlideCanvas from "./SlideCanvas";
 import CourseLibrary from "./CourseLibrary";
 import Icon from "../components/Icon";
+import ConnectionRetry from "./ConnectionRetry";
+import type { ModelRetryStatus } from "../api";
 import {
   createCourse,
   emptyCourseState,
@@ -122,6 +124,7 @@ export default function Course({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [activity, setActivity] = useState<CourseActivity | null>(null);
+  const [modelRetry, setModelRetry] = useState<ModelRetryStatus | null>(null);
   const [course, setCourse] = useState<StoredCourse | null>(activeCourse);
   const session = useRef<CourseSession | null>(null);
   const sessionCourse = useRef<StoredCourse | null>(activeCourse);
@@ -164,6 +167,7 @@ export default function Course({
     setPage(Math.max(0, initialPage));
     setBusy(false);
     setActivity(null);
+    setModelRetry(null);
     setError("");
     const current = new CourseSession(
       info,
@@ -190,6 +194,7 @@ export default function Course({
         });
       },
       setActivity,
+      setModelRetry,
       setError,
       initial,
       {
@@ -379,6 +384,7 @@ export default function Course({
             ))
           )}
           <Activity activity={activity} />
+          <ConnectionRetry status={modelRetry} />
         </div>
         {error && <p className="feedback error" role="alert">{error}</p>}
         <form className="course-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>

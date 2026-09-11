@@ -95,6 +95,118 @@ async function mockCompletedWorkspace(page: Page) {
   );
 }
 
+test("teacher follows the student's requested slide pace while keeping narration synchronized", async ({
+  page,
+}) => {
+  await mockCompletedWorkspace(page);
+  let teacherInstructions = "";
+  await page.route("**/api/learning/course/model", async (route: Route) => {
+    const request = route.request().postDataJSON() as {
+      agent: "teacher" | "slides";
+      payload: {
+        messages: Array<{ role: string; content: unknown }>;
+      };
+    };
+    if (request.agent === "teacher") {
+      teacherInstructions = request.payload.messages
+        .filter((message) => message.role === "system")
+        .map((message) => String(message.content))
+        .join("\n");
+    }
+    await route.fulfill(textResponse("我们开始。"));
+  });
+
+  await page.goto("/");
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("连续讲完五页，不要等我确认");
+  await page.getByRole("button", { name: "发送" }).click();
+  await expect(page.getByText("我们开始。", { exact: true })).toBeVisible();
+
+  expect(teacherInstructions).toMatch(
+    /student's explicit request.+pace.+page count.+takes priority/i,
+  );
+  expect(teacherInstructions).toMatch(
+    /continuous.+do not wait for confirmation.+requested batch is complete/i,
+  );
+  expect(teacherInstructions).toMatch(
+    /one page at a time.+wait for the student/i,
+  );
+  expect(teacherInstructions).toMatch(
+    /show one page.+explain that page.+show_next_slide/i,
+  );
+});
+
+test("a student sees when the model connection is retrying", async ({ page }) => {
+  await mockCompletedWorkspace(page);
+  await page.goto("/");
+  await page.evaluate(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      if (String(input).endsWith("/api/learning/course/model")) {
+        const encoder = new TextEncoder();
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                ': zhiya-retry {"attempt":1,"maxRetries":5}\n\n',
+              ),
+            );
+            window.setTimeout(() => {
+              const response =
+                `data: ${JSON.stringify({
+                  id: "recovered-model",
+                  object: "chat.completion.chunk",
+                  created: 1,
+                  model: "test-model",
+                  choices: [
+                    {
+                      index: 0,
+                      delta: { role: "assistant", content: "连接恢复了，我们继续。" },
+                      finish_reason: null,
+                    },
+                  ],
+                })}\n\n` +
+                `data: ${JSON.stringify({
+                  id: "recovered-model",
+                  object: "chat.completion.chunk",
+                  created: 1,
+                  model: "test-model",
+                  choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+                })}\n\n` +
+                "data: [DONE]\n\n";
+              controller.enqueue(encoder.encode(response));
+              controller.close();
+            }, 800);
+          },
+        });
+        return Promise.resolve(
+          new Response(body, {
+            status: 200,
+            headers: { "Content-Type": "text/event-stream" },
+          }),
+        );
+      }
+      return originalFetch(input, init);
+    };
+  });
+
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("给我讲一个简单概念");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(
+    page.getByText("连接不稳定，正在重新连接（1/5）", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("连接恢复了，我们继续。", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("连接不稳定，正在重新连接（1/5）", { exact: true }),
+  ).toHaveCount(0);
+});
+
 test("a student keeps talking while slides arrive and replaces unfinished pages", async ({
   page,
 }) => {
