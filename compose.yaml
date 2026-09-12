@@ -2,22 +2,22 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: zhiya
-      POSTGRES_PASSWORD: zhiya-local
-      POSTGRES_DB: zhiya
+      POSTGRES_USER: ${POSTGRES_USER:?Use npm run dev:services}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Use npm run dev:services}
+      POSTGRES_DB: ${POSTGRES_DB:?Use npm run dev:services}
     ports:
-      - "127.0.0.1:54329:5432"
+      - "${POSTGRES_BIND:?Use npm run dev:services}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zhiya -d zhiya"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 2s
       timeout: 3s
       retries: 20
   mailpit:
     image: axllent/mailpit:v1.27
     ports:
-      - "127.0.0.1:1025:1025"
-      - "127.0.0.1:8025:8025"
+      - "${MAILPIT_SMTP_BIND:?Use npm run dev:services}:1025"
+      - "${MAILPIT_HTTP_BIND:?Use npm run dev:services}:8025"
 volumes:
   postgres-data:

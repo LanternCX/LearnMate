@@ -1,3 +1,5 @@
+@layer theme, base, components, utilities;
+@layer base {
 :root {
   color-scheme: light;
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -40,7 +42,7 @@ button {
   border-radius: 12px;
 }
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.65;
 }
 button,
@@ -129,84 +131,15 @@ p {
 .ambient-background {
   position: fixed;
   inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: -1;
   pointer-events: none;
-  overflow: hidden;
-}
-.ambient-light {
-  position: absolute;
-  inset: -8vmax;
-  translate: var(--drift-x, 0px) var(--drift-y, 0px);
-  transition: translate 900ms ease-out;
-}
-.ambient-patch {
-  position: absolute;
-  width: 48vmax;
-  height: 40vmax;
-  left: -5%;
-  top: 4%;
-  background: var(--ambient-sage);
-  filter: blur(32px);
-  border-radius: 37% 63% 68% 32% / 56% 29% 71% 44%;
-  animation: ambient-drift 14s ease-in-out infinite alternate;
-}
-.ambient-patch:nth-child(2) {
-  left: 47%;
-  top: -12%;
-  width: 42vmax;
-  height: 52vmax;
-  background: var(--ambient-gold);
-  animation-duration: 19s;
-  animation-delay: -7s;
-  animation-direction: alternate-reverse;
-}
-.ambient-patch:nth-child(3) {
-  left: 56%;
-  top: 55%;
-  width: 50vmax;
-  height: 34vmax;
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
-  animation-duration: 17s;
-  animation-delay: -11s;
-}
-.ambient-patch:nth-child(4) {
-  left: 8%;
-  top: 62%;
-  width: 38vmax;
-  height: 30vmax;
-  background: color-mix(in srgb, var(--surface) 48%, transparent);
-  animation-duration: 23s;
-  animation-delay: -4s;
-  animation-direction: alternate-reverse;
-}
-@keyframes ambient-drift {
-  0% {
-    transform: translate(-8%, -10%) rotate(-18deg);
-    border-radius: 37% 63% 68% 32% / 56% 29% 71% 44%;
-  }
-  50% {
-    transform: translate(12%, 8%) rotate(8deg);
-    border-radius: 66% 34% 43% 57% / 37% 64% 36% 63%;
-  }
-  100% {
-    transform: translate(-2%, 22%) rotate(26deg);
-    border-radius: 44% 56% 28% 72% / 68% 42% 58% 32%;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ambient-light,
-  .ambient-patch {
-    animation: none;
-    translate: none;
-    transition: none;
-  }
 }
 .glass {
   background: var(--glass);
   border: 1px solid var(--glass-edge);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(22px) saturate(115%);
-  -webkit-backdrop-filter: blur(22px) saturate(115%);
   border-radius: 16px;
 }
 .signed-out {
@@ -318,6 +251,7 @@ input:not([type="checkbox"]):not([type="file"]) {
   display: block;
   margin: -16px 0 12px auto;
 }
+.recovery-link { margin-left: 20px; }
 .switch-auth {
   grid-column: 2;
   display: flex;
@@ -333,14 +267,81 @@ input:not([type="checkbox"]):not([type="file"]) {
 .password-field {
   position: relative;
 }
+.field-error, .field-hint {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.field-error { color: var(--error); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.field-hint { color: var(--muted); }
+input[aria-invalid="true"] { border-color: var(--error) !important; }
+.password-rules {
+  list-style: none;
+  padding: 0;
+  margin: -4px 0 20px;
+  font-size: 13px;
+  color: var(--muted);
+  display: grid;
+  gap: 8px;
+}
+.password-rules li { display: flex; gap: 8px; align-items: center; }
+.password-rules [data-met="true"] { color: var(--accent); }
+.password-rules svg, .password-success {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.password-success { position: absolute; right: 58px; top: 45px; color: var(--accent); }
+.password-field.has-success input { padding-right: 88px !important; }
 .password-field input {
-  padding-right: 64px !important;
+  padding-right: 56px !important;
+}
+/* The shared password field provides its own reveal button. */
+.password-field input::-ms-reveal {
+  display: none;
 }
 .password-toggle {
   position: absolute;
-  right: 12px;
+  right: 5px;
   top: 33px;
-  font-size: 13px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+}
+.password-toggle:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.password-toggle:focus-visible {
+  outline-offset: -2px;
+}
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .hint {
   font-size: 13px;
@@ -352,15 +353,15 @@ input:not([type="checkbox"]):not([type="file"]) {
   display: block;
   margin-top: 12px;
 }
+.verification-help { display: grid; gap: 6px; margin: -8px 0 20px; }
+.verification-actions { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
 .feedback {
-  padding: 12px 16px;
-  border-left: 3px solid var(--accent);
-  background: var(--subtle);
+  margin: 0 0 20px;
+  color: var(--text);
   font-size: 14px;
   overflow-wrap: anywhere;
 }
 .error {
-  border-color: var(--error);
   color: var(--error);
 }
 .sidebar {
@@ -481,19 +482,6 @@ input:not([type="checkbox"]):not([type="file"]) {
 .back {
   margin: -16px 0 20px;
 }
-.deletion-warning {
-  border-left: 3px solid var(--error);
-  padding: 12px 20px;
-  margin: 24px 0;
-  background: var(--subtle);
-}
-.deletion-warning h2 {
-  color: var(--error);
-}
-.deletion-warning p {
-  margin-bottom: 0;
-  font-size: 15px;
-}
 .checkbox {
   display: flex;
   gap: 12px;
@@ -510,6 +498,8 @@ input:not([type="checkbox"]):not([type="file"]) {
   height: 20px;
   accent-color: var(--accent);
 }
+.deletion-consent { margin-bottom: 24px; }
+.deletion-consent .checkbox { margin-bottom: 8px; }
 .connection {
   grid-column: 1 / -1;
   margin: 60px auto;
@@ -538,12 +528,21 @@ footer {
   background: #142d2a66;
   backdrop-filter: blur(4px);
 }
+.confirmation .inline-actions { justify-content: flex-end; }
+.confirmation p { overflow-wrap: anywhere; }
+.confirmation { max-height: calc(100dvh - 32px); overflow-y: auto; }
 @media (min-width: 721px) {
   .signed-out {
     grid-template-rows: auto minmax(48px, 1fr) auto auto minmax(48px, 1fr) auto;
   }
   .signed-out .brand {
     margin-bottom: 0;
+  }
+  .signed-out:has(.password-rules) {
+    grid-template-rows: auto 24px auto auto 24px auto;
+  }
+  .signed-out:has(.password-rules) .account-surface {
+    padding: 24px 32px;
   }
   .signed-out .welcome {
     grid-row: 3 / 5;
@@ -671,7 +670,7 @@ footer {
   color: #202928;
 }
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .glass, .confirmation { background: var(--subtle); }
+  .confirmation { background: var(--subtle); }
 }
 button,
 input:not([type="file"]) {
@@ -744,4 +743,5 @@ input:not([type="checkbox"]):not([type="file"]):focus {
     -webkit-backdrop-filter: none;
   }
   .confirmation::backdrop { backdrop-filter: none; }
+}
 }

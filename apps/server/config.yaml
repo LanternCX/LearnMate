@@ -1,0 +1,46 @@
+# Deployment configuration. Paths are relative to this file.
+# Override a field with ZHIYA_SERVER_<SECTION>_<KEY>.
+development: true
+
+# OpenAI-compatible Chat Completions endpoint, including /v1/chat/completions.
+# Leave empty to run account services without a model. Never put live keys here.
+model:
+  endpoint: ""
+  id: ""
+  api_key: ""
+
+http:
+  listen: "127.0.0.1:8080"
+  origin: "http://127.0.0.1:1420"
+  web_dir: "../client/dist"
+  startup_timeout_seconds: 15
+  shutdown_timeout_seconds: 5
+  read_header_timeout_seconds: 5
+  read_timeout_seconds: 30
+  write_timeout_seconds: 30
+  idle_timeout_seconds: 60
+  request_timeout_seconds: 20
+  cleanup_interval_seconds: 60
+  max_body_bytes: 3145728
+
+# These credentials are for the loopback development database only.
+# Supply production credentials through the deployment environment.
+database:
+  url: "postgres://zhiya:zhiya-local@127.0.0.1:54329/zhiya?sslmode=disable"
+
+smtp:
+  address: "127.0.0.1:1025"
+  from: "Zhiya <noreply@zhiya.local>"
+  username: ""
+  password: ""
+  timeout_seconds: 10
+
+# Operational limits. Durations are in seconds; counts apply per rate window.
+account:
+  session_ttl_seconds: 2592000
+  verification_attempts: 5
+  rate_window_seconds: 60
+  ip_limit: 60
+  mail_limit: 5
+  login_limit: 10
+  email_change_limit: 5

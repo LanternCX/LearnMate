@@ -54,7 +54,7 @@ For younger students, use more images, concrete examples, and conversational gui
 
 ## Color and surfaces
 
-两套配色共用语义色彩。主题切换参考 [Cao Xin 的博客](https://www.caoxin.xyz/)，提供“自动 → 浅色 → 深色”的循环选择，而非三套独立配色。默认跟随系统，手动选择应在刷新后保留；只有自动模式响应系统外观变化。顶栏右侧使用轻量图标按钮，以半圆、太阳和月亮区分状态，并通过可访问名称说明当前状态与下一次点击的结果。
+两套配色共用语义色彩。主题切换参考 [Cao Xin 的博客](https://www.caoxin.xyz/)，提供“自动 → 浅色 → 深色”的循环选择，而非三套独立配色。默认跟随系统，手动选择应在刷新后保留；只有自动模式响应系统外观变化。登录页在顶栏右侧提供轻量图标按钮，登录后收进头像菜单的“外观”。以半圆、太阳和月亮区分状态，并通过可访问名称说明当前状态与下一次点击的结果；菜单关闭时仍响应系统外观变化。
 
 | Token | Sage light | Graphite dark | Purpose |
 | --- | --- | --- | --- |
@@ -93,12 +93,23 @@ Do not shrink an individual heading to preserve a layout. Adjust the copy, measu
 
 Prioritize function and brevity in interface copy. State the task, result, or next action directly. Omit motivational slogans, repeated explanations, and routine reassurance. Keep teaching explanations and questions when they support understanding; do not repeat the heading in supporting text. Use short, specific button labels. Reserve companion labels for actual dialogue, and report learning evidence without claiming mastery from a single answer. Error messages should state the problem and available recovery action.
 
+### 用 UI 表达，不重复解释 UI
+
+这是所有页面、组件与后续改动必须遵守的规则：图标、控件状态、布局或交互已能清楚表达的信息，不再用可见文字重复解释。先判断用户还缺少什么信息，再决定是否需要文案。
+
+- 选中状态、密码匹配、规则满足、显示／隐藏和提交进度优先通过对应控件表达。不在已打勾的规则下再写“密码符合要求”，也不在已有进度状态旁再放一段“正在处理，请稍候”。
+- 不解释常见控件的常规用法，不重复标题、字段标签或按钮名称。文字只补充 UI 无法传达的信息，例如具体限制、错误原因、恢复方法和不可逆操作的实际后果。
+- 颜色不能单独承担状态表达；配合一致的 SVG 图形或控件形态。图标保留可访问名称，必要的状态通过屏幕阅读器播报，无需为此增加重复的可见文案。
+- 不使用锐角矩形、整块底色或左侧竖线的 Notice／Alert 作为通用提示容器。普通反馈就地呈现，不为每条提示另加卡片；把方形提示框改成圆角提示框不能解决多余容器的问题。
+- 不可逆操作的具体后果集中在最终确认弹窗中说明，页面保留明确的操作名称和必要的确认控件，不再重复堆叠警告标题与说明块。确认弹窗沿用现有浮层样式。
+- 审核每条提示时检查：去掉它是否会使用户缺少决策、纠错或继续操作所需的信息？若不会，就删除。不要为了视觉简洁隐瞒失败或删掉必要的教学解释。
+
 ## Spacing and responsive composition
 
 - Use the spacing scale 4, 8, 12, 16, 24, 32, 48, and 64. Keep explanations close to their objects and separate unrelated tasks.
 - Inspect desktop designs at 1440 × 1000 and mobile designs at 390 × 844, with an additional check at 320 wide. These are design samples, not commitments to particular operating systems.
-- Use a desktop content width of at most 1200 with side margins of at least 32. Use 20 on mobile, reducing to 16 on narrow screens.
-- Wide workspaces may use a 208-wide sidebar. Narrow screens use a top bar and bottom navigation. Focused lessons hide the persistent sidebar while retaining back navigation, the lesson title, contents, and practice access.
+- Fill the desktop window with the application shell; constrain reading content rather than the whole app. Onboarding uses a maximum reading width of 680 with 32-pixel side margins. Use 20 on mobile, reducing to 16 on narrow screens.
+- After onboarding, wide workspaces use a 224-wide sidebar that collapses to an 80-wide icon rail; narrow screens use a top bar and bottom navigation. Onboarding occupies the full window on every device, with all global navigation hidden until completion. Focused lessons retain back navigation, the lesson title, contents, and practice access.
 - Integrate the sidebar into the workspace canvas. Do not enclose it in a card, glass panel, rounded container, border, or shadow. Rounded highlighting belongs to the selected navigation item.
 - Recompose to one column when the content area falls below 720 wide. Never proportionally shrink the desktop artboard. Teaching examples may wrap; code and necessary data tables may scroll within their own regions.
 - Desktop lesson controls combine playback, speed, captions, pagination, and questions. Mobile separates playback and progress from the question input, accounting for safe areas and the software keyboard.
@@ -133,7 +144,7 @@ These rules govern presentation and reference the corresponding PRD sections wit
 
 ### Practice and experiment feedback
 
-Selected, correct, and try-again states need both words and visual cues. Do not clear an answer after an incorrect submission. Offer an actionable hint and another attempt; the timing of answer disclosure follows teaching requirements.
+Selected, correct, and try-again states need distinguishable visual cues and accessible semantics. Add words when they explain the result or the next step, not merely to repeat the state. Do not clear an answer after an incorrect submission. Offer an actionable hint and another attempt; the timing of answer disclosure follows teaching requirements.
 
 Experiment data counts, parameters, outputs, and execution states must correspond. Label illustrative results as examples and do not generalize from a single run. Parameters need visible labels, ranges, and current values. Do not present unresolved programming languages or debugging capabilities as supported product commitments.
 
@@ -153,6 +164,12 @@ Images serve learning. Keep aspect ratios and label positions consistent within 
 
 ### 账号入口的构图与动效
 
+工作区沿用克制的动效语言：侧栏宽度平滑收放，页面与菜单轻柔出现，选中标记短促浮现。过渡约 160–240ms，不延迟提交或清空输入，不改变问答的字号与布局；首次建档与后续档案补充共用问答及思考状态。减少动态效果模式下直接切换状态。
+
+学习档案从头像菜单进入主面板，查看、发起修改、思考、逐题回答和保存结果均在主面板内完成，不使用档案弹窗，也不在生成结束后自动跳回编辑页。修改必须经过提问和回答，成功写入档案后才显示完成；普通生成文字不替代问题或保存结果。
+
+微调问答期间顶部提供“停止对话”退出图标，停止后结束本轮修改并返回档案，不提供暂停、继续或断点恢复。已保存档案保留，未完成的问题关闭，旧请求不得继续写入。重新进入时发起新一轮修改；首次建档仍保留进度恢复。图标按钮提供可访问名称和悬停提示，触控区域至少 44 × 44。
+
 登录、注册和找回密码页采用同一套入口视觉。顶栏的叶芽图标、知芽字标和主题按钮直接融入背景，不使用卡片背景、边框或阴影，也不附加宣传短句或背景播放按钮。桌面端将欢迎区与表单整体放在顶栏和页脚之间，使上下留白均衡；页脚位于短页面底部，长页面则随内容自然向下排列。手机端使用单列，优先保证表单完整可用。
 
 入口应有适中的信息密度：欢迎文字靠近表单，避免窄小控件被大片留白包围。优先放大表单文字、输入框和主按钮，并收紧栏间距、表单内边距与字段间距；不通过整体缩放页面或压缩触控区域实现紧凑。较窄窗口允许文字自然换行，同时保留清晰的标签与完整操作区。
@@ -163,10 +180,18 @@ Images serve learning. Keep aspect ratios and label positions consistent within 
 - 鼠标移动带动背景产生柔和、有边界的偏移，表单和文字保持稳定。触屏无需模拟鼠标跟随，也不阻拦滚动或输入。
 - 页面进入和账号视图切换使用约 240–480ms 的淡入与小幅上移；避免整页缩放、弹跳和逐字出现。验证码等步骤的内容切换也应有连贯反馈，不清空已有输入来制造动画。
 - 按钮悬停轻微上移，按下轻微收缩；输入框聚焦时平滑突出边界。交互反馈以约 150–220ms 为起点，不延迟操作执行。
-- 提交中的动作保留明确文字和禁用状态，可辅以小型进度动画；结果提示与确认弹窗轻柔出现。动效不能代替成功、失败或等待状态的文字说明。
+- 提交中的动作在控件内表达进度与禁用状态，并提供可访问状态播报，不额外堆叠等待说明。结果反馈与确认弹窗轻柔出现；关闭动效后，状态仍须可辨认。
 - 开启系统“减少动态效果”时，关闭背景循环、鼠标跟随、位移动画和进度旋转，保留静态背景、焦点指示与状态文字。动画不可承担唯一的信息表达。
 
 连续氛围动画仅用于账号入口，不扩展到需要持续阅读的课堂。教学动画应服务于概念解释，并提供暂停和文字说明；避免强制音频。深浅色均须检查动画完整过程中的对比度，正文和输入区域保持清晰、稳定。
+
+### 提示文案与表单反馈
+
+- 提示直接说明结果或下一步操作，使用学生能理解的日常语言，删除“若该邮箱符合条件”“已申请发送”等含糊措辞。无法确认邮件实际发送时，使用“请查看邮箱，在 10 分钟内填写验证码”这类操作指引，不声称已经发送；有效期按实际配置显示。
+- 成功、错误和字段辅助提示末尾不加句号。优先使用简短单句，不堆叠重复说明；需要说明多个相关信息时，保留必要的分隔。
+- 不把内部技术限制直接交给用户理解。例如，密码太短时提示“密码至少需要 8 个字符”，过长时提示“密码太长，请缩短后重试”，不将字符数与字节数混在一条提示中。具体限制使用当前服务端规则，本指南不定义账号策略。
+- 密码显示／隐藏使用眼睛、划线眼睛 SVG 图标，不显示“显示”“隐藏”文字按钮。图标沿用现有线条风格，并保留可访问名称、状态、键盘焦点和至少 44 × 44 的触控区域。
+- 字段错误就地显示具体原因；表单级失败或无法由控件表达的结果使用简短、无容器的反馈。不要使用背景色块、边框或左侧竖线包裹普通提示。只有需要用户作出决定时才使用确认弹窗。深浅主题、窄屏和长文案都应保持可读且不溢出。
 
 ## Language and student data
 
@@ -199,10 +224,20 @@ Design artifacts use editable text and layouts, semantic colors, consistent typo
 
 Frontend implementation follows the project's React, TypeScript, Vite, and Tauri boundaries. These guidelines do not require another UI framework; use native semantics and existing components for behavior. Validate keyboard access, screen readers, zoom, and real devices during implementation. Figma inspection cannot substitute for runtime acceptance.
 
-## View the static design gallery
+## Application navigation and educational identity
 
-Open [demo.html](demo.html) in a browser, or serve the repository with `uv run --no-project python -m http.server 4173 --bind 127.0.0.1` and visit `http://127.0.0.1:4173/docs/design/demo.html`. Gallery links navigate between screen examples. Product controls illustrate appearance only; they do not submit answers, record audio, run experiments, or store student data.
+The running React application in `apps/client` is the visual reference. Use `npm run dev` with the documented local services to inspect actual behavior; do not maintain a parallel HTML/CSS gallery. Browser tests may use explicit API fixtures for unconnected services, but product screens must display real state.
 
-The gallery covers onboarding, the course map, narration, interrupted lessons, practice feedback, exploration, the lab, learning review, a graphite classroom, and recovery states. Resize the browser to inspect mobile layouts. Exported design images live in [screenshots/](screenshots/).
+- Desktop uses a full-height workspace with a 224-pixel sidebar, collapsible to an 80-pixel icon rail. Keep the navigation stable while the content scrolls. Main destinations use familiar SVG symbols for learning, exploration, experiments, and review. Expanded navigation uses short labels; collapsed navigation retains accessible names and hover titles.
+- Anchor the avatar menu at the bottom of the desktop sidebar and at the top right on phones. Group learning records used for personalization under “学习档案”, alongside profile, account security, appearance, and sign out. The avatar menu is the account entry point; avoid repeating these actions on the learning canvas.
+- Onboarding is a full-window experience on desktop and phone. Hide workspace navigation, the avatar menu, and other destinations until the saved completion state arrives, but always provide an accessible “退出建档” control, including during loading and thinking. Confirming exit signs out and returns to login; it never unlocks the workspace. Explain that submitted answers remain saved and unsent content is lost. Canceling or a failed sign-out keeps the current flow. A fresh session shows “欢迎来到知芽”, one short introduction, and “开始” before starting the model. Reloading an existing conversation resumes it without repeating the welcome. No fixed question count or new completion threshold is introduced.
+- Phone layouts use four bottom destinations after onboarding. Reserve safe-area space and keep the answer input reachable as the viewport resizes. After onboarding, opening the learning-profile dialog moves focus inside; Escape and its close button dismiss it and return focus to the avatar. Background learning state can continue to synchronize.
+- Submitting a learning-profile correction closes the editor and selects the learning destination after any unsaved-account-edit confirmation is accepted. Reuse the same question and thinking components as initial onboarding, including the large animated icon and small caption. Initial completion does not suppress an active correction or its follow-up questions. Keep the workspace navigation available. When the local correction finishes, reopen the latest profile; retain the correction draft and show an error inside the editor on failure. Change the selected destination only after navigation is accepted.
+- The onboarding questionnaire is a product-owned interface, not a stock chat input. Preserve its clear heading hierarchy, 16-pixel option text, separated rows, 24-pixel selection indicators, and glass answer surface. Underlying form and selection primitives may come from AI Elements or shadcn, without adopting their default visual layout. “自己填写” expands an inline input and replaces the preset selection. Text-only questions start with this option selected. “还不确定” is also a choice. All answers share one submit button; failed submissions preserve drafts and selections. Do not detach a composer at the bottom of the window; let longer questions scroll naturally.
+- Follow [Apple's material hierarchy](https://developer.apple.com/design/human-interface-guidelines/materials): use a softly tinted canvas, opaque reading surfaces, and translucent interaction layers. Apply glass materials to the questionnaire answer surface, account popover, profile shell, and mobile navigation. Keep text and icons opaque. These are cross-platform CSS materials inspired by Apple, not native Liquid Glass. Provide opaque fallbacks for unavailable blur and reduced transparency.
+- Product styles and interaction design remain locally owned, including AI experiences. Reuse [AI Elements](https://elements.ai-sdk.dev/) and shadcn capabilities selectively: icons, animations, accessibility primitives, input behavior, and content rendering. Import only what is used, preserve licenses, and adapt composition to the product rather than replacing whole pages with stock controls. Message Response, Reasoning, and Shimmer currently render AI output; never fabricate reasoning or show an empty disclosure. Respect reduced motion and retain Chinese input-method protection, Enter to submit, and Shift+Enter for a newline. Keep renderer concerns separate from Pi and server orchestration; concurrent agent output and distinct presentation/teaching surfaces must not be constrained to one library's chat layout. This design boundary does not imply those future capabilities are implemented.
+- Educational identity comes from recognizable book, compass, flask, and record symbols, a consistent sprout brand, and meaningful task states. Use soft green, blue, amber, and violet accents for subject illustrations while retaining the shared sage/graphite palette. Illustrations never imply completed work or mastery.
+- Show truthful empty states for unavailable courses, exploration, experiments, and learning records. Do not invent a course map, progress, or a functioning chat input before its associated capability exists.
+- Keep visible navigation labels short. Familiar actions such as sending, closing, returning, and collapsing can be icon-only, with accessible names. Explain privacy and record-editing consequences inside the relevant profile or confirmation surface, not in persistent learning-page paragraphs. Teaching questions and error recovery retain the words students need.
 
-The cat examples load imagery from the GitHub issue attachment and require a network connection. Exported screenshots and PDFs are excluded from version control. Verify imagery rights before release. Google Fonts supplies the declared Noto families; local serif and sans-serif fallbacks remain available when offline.
+Design references: [Codex task organization](https://openai.com/index/introducing-the-codex-app/), [Doubao Aixue's educational tasks](https://apps.apple.com/cn/app/id6469102455), [Duolingo's visual readability](https://blog.duolingo.com/shape-language-duolingos-art-style/), and [Duolingo's navigation consistency](https://blog.duolingo.com/core-tabs-redesign/). These inform composition and visual clarity, not feature commitments or copied assets.
