@@ -43,7 +43,7 @@
 - `apps/server/config.yaml`：后端部署配置，由 Go 的 `internal/config` 加载和校验。
 - `dev-services.env`：本地 Docker 基础设施配置。
 
-需要 Node.js 22.12+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
+需要 Node.js 22.19+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
 
 ```sh
 npm install
