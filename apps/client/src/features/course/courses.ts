@@ -1,9 +1,9 @@
-import { api } from "../api";
+import { api } from "../../api";
 import type {
   CourseConversationState,
   CourseCover,
   StoredCourse,
-} from "../domain/learning";
+} from "../../domain/learning";
 
 export const emptyCourseState = (): CourseConversationState => ({
   messages: [],

@@ -94,7 +94,7 @@ test("an unconfirmed action is retried with the same request id after reconnecti
   });
   await page.goto("/");
   const result = await page.evaluate(async () => {
-    const { ConversationChannel } = await import("/src/profile/channel.ts");
+    const { ConversationChannel } = await import("/src/features/profile/channel.ts");
     const channel = new ConversationChannel();
     try {
       return await channel.answer("question", {

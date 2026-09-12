@@ -1,6 +1,6 @@
-import { CourseSession } from "../pi";
-import type { ModelGateway } from "../pi";
-import { modelRequest, courseModelRequest } from "../transport/model";
+import { CourseSession } from "../../pi";
+import type { ModelGateway } from "../../pi";
+import { modelRequest, courseModelRequest } from "../../transport/model";
 
 const gateway: ModelGateway = {
   onboarding: modelRequest,

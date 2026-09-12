@@ -1,6 +1,6 @@
-import { APIError, api } from "../api";
-import type { Conversation, ConversationStore } from "../pi";
-import type { Answer } from "../domain/learning";
+import { APIError, api } from "../../api";
+import type { Conversation, ConversationStore } from "../../pi";
+import type { Answer } from "../../domain/learning";
 
 type Pending = {
   action: object;

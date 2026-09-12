@@ -1,13 +1,13 @@
-import { ProfileSession, conversationView } from "../pi";
-import type { ModelGateway } from "../pi";
+import { ProfileSession, conversationView } from "../../pi";
+import type { ModelGateway } from "../../pi";
 import type {
   Answer,
   AssistantOutput,
   ConversationView,
   ModelInfo,
   ModelRetryListener,
-} from "../domain/learning";
-import { modelRequest, courseModelRequest } from "../transport/model";
+} from "../../domain/learning";
+import { modelRequest, courseModelRequest } from "../../transport/model";
 import { ConversationChannel } from "./channel";
 
 const gateway: ModelGateway = {

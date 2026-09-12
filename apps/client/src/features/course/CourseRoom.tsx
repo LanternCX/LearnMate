@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import "./course.css";
-import type { CourseSession } from "../pi";
+import type { CourseSession } from "../../pi";
 import { createCourseSession } from "./runtime";
 import type {
   CourseActivity,
@@ -10,20 +10,20 @@ import type {
   ModelRetryStatus,
   CourseConversationState,
   StoredCourse,
-} from "../domain/learning";
-import { MessageResponse } from "../components/ai-elements/message";
+} from "../../domain/learning";
+import { MessageResponse } from "../../components/ai-elements/message";
 import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "../components/ai-elements/reasoning";
-import { Shimmer } from "../components/ai-elements/shimmer";
-import { PromptInputSubmit } from "../components/ai-elements/prompt-input";
-import { Spinner } from "../components/ui/spinner";
+} from "../../components/ai-elements/reasoning";
+import { Shimmer } from "../../components/ai-elements/shimmer";
+import { PromptInputSubmit } from "../../components/ai-elements/prompt-input";
+import { Spinner } from "../../components/ui/spinner";
 import SlideCanvas from "./SlideCanvas";
 import CourseLibrary from "./CourseLibrary";
-import Icon from "../components/Icon";
-import ConnectionRetry from "../components/ConnectionRetry";
+import Icon from "../../components/Icon";
+import ConnectionRetry from "../../components/ConnectionRetry";
 import {
   createCourse,
   emptyCourseState,

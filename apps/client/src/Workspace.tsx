@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { useAccount } from "./account/useAccount";
-import AccountProfile from "./account/Profile";
-import Security from "./account/Security";
-import CourseRoom from "./course/CourseRoom";
-import Profile from "./profile/Profile";
+import type { useAccount } from "./features/account/useAccount";
+import AccountProfile from "./features/account/Profile";
+import Security from "./features/account/Security";
+import CourseRoom from "./features/course/CourseRoom";
+import Profile from "./features/profile/Profile";
 import Mark from "./components/Mark";
 import Icon, { type IconName } from "./components/Icon";
 import ThemeToggle from "./components/ThemeToggle";
@@ -11,7 +11,7 @@ import {
   deleteCourse,
   listCourses,
   updateCourse,
-} from "./course/courses";
+} from "./features/course/courses";
 import type { ModelInfo, StoredCourse } from "./domain/learning";
 import "./workspace.css";
 

@@ -1,21 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Checkbox } from "../components/ui/checkbox";
-import { api, APIError, type User } from "../api";
+import { RadioGroup, RadioGroupItem } from "../../components/ui/radio-group";
+import { Checkbox } from "../../components/ui/checkbox";
+import { api, APIError, type User } from "../../api";
 import type {
   ModelRetryStatus,
   ConversationView as Conversation,
   ModelInfo,
   Question,
   AssistantOutput,
-} from "../domain/learning";
-import type { ProfileSession } from "../pi";
+} from "../../domain/learning";
+import type { ProfileSession } from "../../pi";
 import { ProfileConnection } from "./runtime";
 import "./profile.css";
-import Mark from "../components/Mark";
-import Icon from "../components/Icon";
-import { Spinner } from "../components/ui/spinner";
-import ConnectionRetry from "../components/ConnectionRetry";
+import Mark from "../../components/Mark";
+import Icon from "../../components/Icon";
+import { Spinner } from "../../components/ui/spinner";
+import ConnectionRetry from "../../components/ConnectionRetry";
 import {
   PromptInput,
   PromptInputFooter,
@@ -23,11 +23,11 @@ import {
   PromptInputTextarea,
   PromptInputProvider,
   usePromptInputController,
-} from "../components/ai-elements/prompt-input";
+} from "../../components/ai-elements/prompt-input";
 
 const AssistantResponse = lazy(() => import("./AssistantResponse"));
 const MessageResponse = lazy(() =>
-  import("../components/ai-elements/message").then((module) => ({
+  import("../../components/ai-elements/message").then((module) => ({
     default: module.MessageResponse,
   })),
 );

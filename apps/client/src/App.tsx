@@ -3,10 +3,10 @@ import ThemeToggle from "./components/ThemeToggle";
 import AmbientBackground from "./components/AmbientBackground";
 import Mark from "./components/Mark";
 import Confirmation from "./components/Confirmation";
-import AuthForms from "./account/AuthForms";
-import { useAccount } from "./account/useAccount";
-import type { View } from "./account/types";
-import { PolicyContext } from "./account/Policy";
+import AuthForms from "./features/account/AuthForms";
+import { useAccount } from "./features/account/useAccount";
+import type { View } from "./features/account/types";
+import { PolicyContext } from "./features/account/Policy";
 import Workspace from "./Workspace";
 
 export default function App() {
