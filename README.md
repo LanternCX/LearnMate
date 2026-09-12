@@ -10,7 +10,7 @@
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-22c55e?style=flat-square)](LICENSE)
 
-[产品需求](https://github.com/LanternCX/zhiya/issues/3) · [参与贡献](CONTRIBUTING.md) · [本地开发](docs/development.md)
+[参与贡献](CONTRIBUTING.md) · [本地开发](docs/development.md)
 
 </div>
 
@@ -29,18 +29,6 @@
 知芽围绕一个持续循环工作：
 
 > 了解学生 → 组织教学 → 观察反馈 → 更新认识 → 调整下一步学习
-
-## 当前进展
-
-当前已经可以完成：
-
-- 邮箱注册、登录、个人资料与账号安全管理；
-- 通过自然对话建立和维护学生档案；
-- 创建、恢复并继续文字课堂；
-- 在对话过程中动态生成和展示分页课件；
-- 在多个在线设备之间同步已经保存的会话状态。
-
-自由知识探索、互动练习、语音交互、AI 实验室和完整的自适应学习路径仍在规划或开发中。产品目标、范围和验收场景以[产品需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3)为准。
 
 ## 系统架构
 
@@ -70,9 +58,7 @@ npm run dev
 
 ## 参与贡献
 
-欢迎通过 Issue 和 Pull Request 一起完善知芽。开始前请阅读[贡献指南](CONTRIBUTING.md)，了解项目的协作方式、人工审核要求和提交流程。
-
-本项目参加第二届浙江省大学生人工智能竞赛揭榜挂帅赛题 `JBGS-2026-02`，赛题原文与交付要求见[赛事说明](docs/competition.md)。
+欢迎通过 Issue 和 Pull Request 一起完善知芽。开始前请阅读[贡献指南](CONTRIBUTING.md)，了解项目的协作方式、人工审核要求和提交流程；项目目标、范围和验收场景见[产品需求 Issue #3](https://github.com/LanternCX/zhiya/issues/3)。
 
 ## License
 
