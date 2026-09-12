@@ -26,6 +26,10 @@
 - `apps/client/src/account/`：账号状态、注册登录、个人资料和安全设置。
 - `apps/client/src/components/`：品牌、主题、背景和确认弹窗等公共控件。
 - `apps/client/src/pi/`：客户端 Agent 运行与教学编排，通过 `index.ts` 提供会话接口；不依赖 React 或具体网络传输。
+- `apps/client/src/pi/agent/`：只维护具体 Agent，每个文件包含对应的 System Prompt、工具清单与创建配置。
+- `apps/client/src/pi/tools/`：只维护具体工具，每个文件按工具名称命名，包含参数、专属类型、描述与执行逻辑。
+- `apps/client/src/pi/agent.ts` 和 `tool.ts`：分别统筹公共 Agent 创建与模型流适配，以及工具结果接入和共享类型，保留现有通信协议。
+- `apps/client/src/pi/sessions/`：协调建档恢复、执行权、停止、课件并发和讲解同步，通过 Agent 工厂启动各场景。
 - `apps/client/src/learning/runtime.ts`：装配 PI 与业务能力，将建档消息转换为 UI 展示状态；`channel.ts` 和 `courses.ts` 负责业务同步与持久化。
 - `apps/client/src/domain/learning.ts`：UI、业务层与 PI 共用的学习数据类型，不包含 PI SDK 消息类型。
 - `apps/client/src/transport/`：模型流传输及共享账号身份状态；HTTP 请求与模型流使用同一账号切换版本。
