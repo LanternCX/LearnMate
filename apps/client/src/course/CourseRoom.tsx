@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./course.css";
 import type { CourseSession } from "../pi";
 import { createCourseSession } from "./runtime";
 import type {
@@ -22,7 +23,7 @@ import { Spinner } from "../components/ui/spinner";
 import SlideCanvas from "./SlideCanvas";
 import CourseLibrary from "./CourseLibrary";
 import Icon from "../components/Icon";
-import ConnectionRetry from "./ConnectionRetry";
+import ConnectionRetry from "../components/ConnectionRetry";
 import {
   createCourse,
   emptyCourseState,
@@ -90,7 +91,7 @@ function Activity({ activity }: { activity: CourseActivity | null }) {
   );
 }
 
-export default function Course({
+export default function CourseRoom({
   info,
   memory,
   courses,

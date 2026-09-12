@@ -8,16 +8,14 @@ import type {
   ModelInfo,
   Question,
   AssistantOutput,
-  StoredCourse,
 } from "../domain/learning";
-import type { LearningSession } from "../pi";
-import { LearningConnection } from "./runtime";
-import "./learning.css";
+import type { ProfileSession } from "../pi";
+import { ProfileConnection } from "./runtime";
+import "./profile.css";
 import Mark from "../components/Mark";
 import Icon from "../components/Icon";
-import Course from "./CourseRoom";
 import { Spinner } from "../components/ui/spinner";
-import ConnectionRetry from "./ConnectionRetry";
+import ConnectionRetry from "../components/ConnectionRetry";
 import {
   PromptInput,
   PromptInputFooter,
@@ -34,7 +32,7 @@ const MessageResponse = lazy(() =>
   })),
 );
 
-export default function Learning({
+export default function Profile({
   user,
   memoryOpen,
   editing,
@@ -42,7 +40,7 @@ export default function Learning({
   ending,
   setEnding,
   onOnboardingChange,
-  courseLibrary,
+  onContextChange,
   visible = true,
 }: {
   user: User;
@@ -52,18 +50,7 @@ export default function Learning({
   ending: boolean;
   setEnding: (value: boolean) => void;
   onOnboardingChange: (value: boolean) => void;
-  courseLibrary: {
-    courses: StoredCourse[];
-    activeCourse: StoredCourse | null;
-    coursesReady: boolean;
-    roomToken: number;
-    error: string;
-    onOpen: (course: StoredCourse) => void;
-    onRename: (course: StoredCourse, title: string) => Promise<boolean>;
-    onDelete: (course: StoredCourse) => Promise<boolean>;
-    onCourseCreated: (course: StoredCourse) => void;
-    onCourseUpdated: (course: StoredCourse) => void;
-  };
+  onContextChange: (context: { memory: string; model: ModelInfo | null }) => void;
   visible?: boolean;
 }) {
   const [state, setState] = useState<Conversation | null>(null);
@@ -78,8 +65,8 @@ export default function Learning({
   const [stopped, setStopped] = useState(false);
   const paused = useRef(false);
   const [introduced, setIntroduced] = useState(false);
-  const session = useRef<LearningSession | null>(null);
-  const channel = useRef<LearningConnection | null>(null);
+  const session = useRef<ProfileSession | null>(null);
+  const channel = useRef<ProfileConnection | null>(null);
   const generation = useRef(0);
   const latest = useRef<Conversation | null>(null);
   const alive = useRef(true);
@@ -183,7 +170,7 @@ export default function Learning({
     alive.current = true;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    const connection = new LearningConnection();
+    const connection = new ProfileConnection();
     channel.current = connection;
     const unsubscribe = connection.subscribe((next) => {
       if (disposed) return;
@@ -229,6 +216,9 @@ export default function Learning({
       if (channel.current === connection) channel.current = null;
     };
   }, [user.id]);
+  useEffect(() => {
+    if (state) onContextChange({ memory: state.memory, model: info });
+  }, [state?.memory, info, onContextChange]);
   const active =
     !stopped &&
     (running ||
@@ -253,7 +243,7 @@ export default function Learning({
     <section
       className="learning-surface"
       data-hidden={!visible}
-      aria-label="学习空间"
+      aria-label="建档与档案维护"
     >
       {!state ? (
         <div className="learning-loading">
@@ -261,22 +251,6 @@ export default function Learning({
         </div>
       ) : (
         <>
-          {state.completed && !memoryOpen && (
-            <Course
-              info={info}
-              memory={state.memory}
-              courses={courseLibrary.courses}
-              activeCourse={courseLibrary.activeCourse}
-              coursesReady={courseLibrary.coursesReady}
-              roomToken={courseLibrary.roomToken}
-              libraryError={courseLibrary.error}
-              onOpenCourse={courseLibrary.onOpen}
-              onRenameCourse={courseLibrary.onRename}
-              onDeleteCourse={courseLibrary.onDelete}
-              onCourseCreated={courseLibrary.onCourseCreated}
-              onCourseUpdated={courseLibrary.onCourseUpdated}
-            />
-          )}
           <div hidden={state.completed && (!memoryOpen || editing)}>
             {!introduced &&
             !state.completed &&

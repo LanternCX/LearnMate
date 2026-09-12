@@ -54,7 +54,7 @@ export function correctionProgress(state: Conversation) {
   return { answered, saved };
 }
 
-export class LearningSession {
+export class ProfileSession {
   private agent: Agent | null = null;
   private stopped = false;
   private runId = "";

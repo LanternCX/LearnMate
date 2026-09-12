@@ -1,4 +1,4 @@
-import { CourseSession, LearningSession, conversationView } from "../pi";
+import { ProfileSession, conversationView } from "../pi";
 import type { ModelGateway } from "../pi";
 import type {
   Answer,
@@ -16,7 +16,7 @@ const gateway: ModelGateway = {
 };
 
 /** Own the business connection; expose presentation state to React and storage to PI. */
-export class LearningConnection {
+export class ProfileConnection {
   private channel = new ConversationChannel();
 
   subscribe(listener: (state: ConversationView) => void) {
@@ -41,7 +41,7 @@ export class LearningConnection {
     output: (value: AssistantOutput) => void,
     onRetry: ModelRetryListener,
   ) {
-    return new LearningSession(
+    return new ProfileSession(
       gateway,
       info,
       this.channel,
@@ -54,13 +54,4 @@ export class LearningConnection {
   close() {
     this.channel.close();
   }
-}
-
-type CourseArguments = ConstructorParameters<typeof CourseSession> extends [
-  ModelGateway,
-  ...infer Arguments,
-] ? Arguments : never;
-
-export function createCourseSession(...args: CourseArguments) {
-  return new CourseSession(gateway, ...args);
 }

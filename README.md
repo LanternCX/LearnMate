@@ -30,7 +30,9 @@
 - `apps/client/src/pi/tools/`：只维护具体工具，每个文件按工具名称命名，包含参数、专属类型、描述与执行逻辑。
 - `apps/client/src/pi/agent.ts` 和 `tool.ts`：分别统筹公共 Agent 创建与模型流适配，以及工具结果接入和共享类型，保留现有通信协议。
 - `apps/client/src/pi/sessions/`：协调建档恢复、执行权、停止、课件并发和讲解同步，通过 Agent 工厂启动各场景。
-- `apps/client/src/learning/runtime.ts`：装配 PI 与业务能力，将建档消息转换为 UI 展示状态；`channel.ts` 和 `courses.ts` 负责业务同步与持久化。
+- `apps/client/src/profile/`：学生建档与 Memory 维护，包括档案界面、会话接入和 WebSocket 同步；对应 PI 的 `ProfileSession`。
+- `apps/client/src/course/`：课程列表与动态课堂，Workspace 直接接入 `CourseRoom`；`runtime.ts` 接入 `CourseSession`，`courses.ts` 负责课程持久化。
+- `Workspace` 组合档案与课堂入口，依据建档完成状态开放学习，并把保存的 Memory 作为课堂上下文传入；两个业务不互相管理会话。
 - `apps/client/src/domain/learning.ts`：UI、业务层与 PI 共用的学习数据类型，不包含 PI SDK 消息类型。
 - `apps/client/src/transport/`：模型流传输及共享账号身份状态；HTTP 请求与模型流使用同一账号切换版本。
 - `apps/client/src/api.ts` 与 `apps/client/src-tauri/src/account.rs`：浏览器及桌面请求、会话隔离与系统凭证存储。

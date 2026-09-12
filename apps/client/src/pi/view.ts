@@ -1,6 +1,6 @@
 import type { ConversationView } from "../domain/learning";
 import type { Conversation } from "./contracts";
-import { correctionProgress } from "./sessions/learning";
+import { correctionProgress } from "./sessions/profile";
 
 /** Keep PI transcript details out of rendering and application state. */
 export function conversationView(state: Conversation): ConversationView {

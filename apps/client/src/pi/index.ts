@@ -1,4 +1,4 @@
-export { LearningSession } from "./sessions/learning";
+export { ProfileSession } from "./sessions/profile";
 export { CourseSession } from "./sessions/course";
 export { conversationView } from "./view";
 export type { ModelGateway } from "./gateway";
