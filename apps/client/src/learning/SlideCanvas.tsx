@@ -1,4 +1,4 @@
-import type { Slide } from "./course";
+import type { Slide } from "../domain/learning";
 
 function lines(text: string, limit: number) {
   const result: string[] = [];

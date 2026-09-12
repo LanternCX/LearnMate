@@ -10,40 +10,13 @@ import type {
 } from "@earendil-works/pi-ai";
 import { streamSimple } from "@earendil-works/pi-ai/api/openai-completions";
 import { Type } from "typebox";
-import {
-  modelRequest,
-  type ModelRetryListener,
-} from "../api";
-import { ConversationChannel } from "./channel";
-
-export type Question = {
-  id: string;
-  text: string;
-  description?: string;
-  kind: "single" | "multiple" | "text";
-  options: string[];
-};
-export type Conversation = {
-  id: string;
-  purpose: "onboarding";
-  messages: AgentMessage[];
-  question: Question | null;
-  completed: boolean;
-  correctionEnded: boolean;
-  memory: string;
-  memoryVersion: number;
-  messageSequence: number;
-  revision: number;
-  status: "idle" | "running" | "waiting";
-  leaseUntil: string;
-};
-export type Answer = { selected: string[]; text: string; skipped: boolean };
-export type ModelInfo = { id: string; available: boolean };
-export type AssistantOutput = {
-  text: string;
-  reasoning: string;
-  isReasoning: boolean;
-};
+import type {
+  AssistantOutput,
+  ModelInfo,
+  ModelRetryListener,
+} from "../domain/learning";
+import type { Conversation, ConversationStore } from "./contracts";
+import type { ModelGateway } from "./gateway";
 
 const maxInterruptedTurnRetries = 5;
 
@@ -92,8 +65,9 @@ export class LearningSession {
   private runId = "";
   private cancelRetryWait: (() => void) | null = null;
   constructor(
+    private gateway: ModelGateway,
     private info: ModelInfo,
-    private channel: ConversationChannel,
+    private store: ConversationStore,
     private update: (state: Conversation) => void,
     private output: (value: AssistantOutput) => void,
     private onRetry: ModelRetryListener,
@@ -107,12 +81,7 @@ export class LearningSession {
     this.cancelRetryWait?.();
     this.agent?.abort();
     if (this.runId)
-      void this.channel
-        .action({
-          action: "release",
-          runId: this.runId,
-        })
-        .catch(() => {});
+      void this.store.release(this.runId).catch(() => {});
   }
   private waitBeforeRetry(attempt: number) {
     return new Promise<void>((resolve) => {
@@ -143,24 +112,14 @@ export class LearningSession {
       await agent.continue();
     }
   }
-  private async action<T>(action: string, extra: object = {}): Promise<T> {
-    if (this.stopped) throw new Error("会话已离开");
-    return this.channel.action<T>({
-      action,
-      runId: this.runId,
-      ...extra,
-    });
-  }
   private async refresh() {
-    const state = await this.channel.current();
+    const state = await this.store.current();
     if (!this.stopped) this.update(state);
     return state;
   }
   private async execute(id: string): Promise<ToolResultMessage> {
-    const response = await this.action<{
-      waiting?: boolean;
-      result?: ToolResultMessage;
-    }>("tool", { toolCallId: id });
+    if (this.stopped) throw new Error("会话已离开");
+    const response = await this.store.executeTool(this.runId, id);
     let state = await this.refresh();
     if (response.result) return response.result;
     while (!this.stopped) {
@@ -169,24 +128,24 @@ export class LearningSession {
           m.role === "toolResult" && m.toolCallId === id,
       );
       if (result) return result;
-      state = await this.channel.waitForChange(state.revision);
+      state = await this.store.waitForChange(state.revision);
       if (!this.stopped) this.update(state);
     }
     throw new Error("会话已离开");
   }
   async run(userText?: string) {
-    const initial = await this.channel.open();
+    const initial = await this.store.open();
     if (this.stopped) return;
     const startingCorrection = initial.completed && Boolean(userText);
-    const claim = await this.channel.action<{ runId: string }>({
-      action: "claim",
-      ...(startingCorrection
+    const claim = await this.store.claim(
+      startingCorrection && userText
         ? { correctionText: userText, revision: initial.revision }
-        : {}),
-    });
+        : undefined,
+    );
     this.runId = claim.runId;
     const heartbeat = setInterval(() => {
-      void this.action("heartbeat").catch(() => this.stop());
+      if (!this.stopped)
+        void this.store.heartbeat(this.runId).catch(() => this.stop());
     }, 10000);
     try {
       if (this.stopped) return;
@@ -327,7 +286,7 @@ export class LearningSession {
                     : { type: "function", function: { name: "ask_student" } };
                   payload.parallel_tool_calls = false;
                 }
-                return modelRequest(
+                return this.gateway.onboarding(
                   this.runId,
                   payload,
                   init?.signal ?? undefined,
@@ -373,7 +332,7 @@ export class LearningSession {
               event.message.stopReason === "aborted")
           )
             return;
-          await this.action("message", { message: event.message });
+          await this.store.saveMessage(this.runId, event.message);
           state = await this.refresh();
         }
         if (event.type === "tool_execution_end") {
@@ -385,7 +344,8 @@ export class LearningSession {
                 m.role === "toolResult" && m.toolCallId === event.toolCallId,
             )
           ) {
-            await this.action("tool_error", { toolCallId: event.toolCallId });
+            if (this.stopped) return;
+            await this.store.recordToolError(this.runId, event.toolCallId);
             state = await this.refresh();
           }
         }
@@ -406,12 +366,7 @@ export class LearningSession {
       this.onRetry(null);
       clearInterval(heartbeat);
       // Release only this execution; a replacement run's token cannot be affected.
-      await this.channel
-        .action({
-          action: "release",
-          runId: this.runId,
-        })
-        .catch(() => {});
+      await this.store.release(this.runId).catch(() => {});
       if (!this.stopped) await this.refresh();
     }
   }

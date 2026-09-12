@@ -1,26 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Checkbox } from "../components/ui/checkbox";
-import {
-  api,
-  APIError,
-  type ModelRetryStatus,
-  type User,
-} from "../api";
-import {
-  correctionProgress,
-  LearningSession,
-  type Conversation,
-  type ModelInfo,
-  type Question,
-  type AssistantOutput,
-} from "./session";
-import { ConversationChannel } from "./channel";
+import { api, APIError, type User } from "../api";
+import type {
+  ModelRetryStatus,
+  ConversationView as Conversation,
+  ModelInfo,
+  Question,
+  AssistantOutput,
+  StoredCourse,
+} from "../domain/learning";
+import type { LearningSession } from "../pi";
+import { LearningConnection } from "./runtime";
 import "./learning.css";
 import Mark from "../components/Mark";
 import Icon from "../components/Icon";
 import Course from "./CourseRoom";
-import type { StoredCourse } from "./courses";
 import { Spinner } from "../components/ui/spinner";
 import ConnectionRetry from "./ConnectionRetry";
 import {
@@ -84,7 +79,7 @@ export default function Learning({
   const paused = useRef(false);
   const [introduced, setIntroduced] = useState(false);
   const session = useRef<LearningSession | null>(null);
-  const channel = useRef<ConversationChannel | null>(null);
+  const channel = useRef<LearningConnection | null>(null);
   const generation = useRef(0);
   const latest = useRef<Conversation | null>(null);
   const alive = useRef(true);
@@ -103,9 +98,8 @@ export default function Learning({
   const run = async (model: ModelInfo, text?: string) => {
     if (session.current || !channel.current || !alive.current) return false;
     const epoch = generation.current;
-    const current = new LearningSession(
+    const current = channel.current.createSession(
       model,
-      channel.current,
       (next) => {
         if (generation.current === epoch) receive(next);
       },
@@ -156,9 +150,7 @@ export default function Learning({
     paused.current = true;
     session.current?.stop();
     void channel.current
-      ?.action<Conversation>({
-        action: "end_correction",
-      })
+      ?.endCorrection()
       .then((next) => {
         if (!alive.current) return;
         receive(next);
@@ -191,7 +183,7 @@ export default function Learning({
     alive.current = true;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    const connection = new ConversationChannel();
+    const connection = new LearningConnection();
     channel.current = connection;
     const unsubscribe = connection.subscribe((next) => {
       if (disposed) return;
@@ -205,15 +197,8 @@ export default function Learning({
         ]);
         if (disposed) return;
         receive(initial);
-        if (
-          correctionProgress(initial) &&
-          !correctionProgress(initial)?.saved
-        ) {
-          receive(
-            await connection.action<Conversation>({
-              action: "end_correction",
-            }),
-          );
+        if (initial.correction && !initial.correction.saved) {
+          receive(await connection.endCorrection());
         }
         setInfo(model);
         if (
@@ -249,23 +234,10 @@ export default function Learning({
     (running ||
       (state?.status === "running" &&
         Date.parse(state.leaseUntil) > Date.now()));
-  const progress = state ? correctionProgress(state) : null;
-  const lastMessage = state?.messages.at(-1);
+  const progress = state?.correction;
   const output = liveOutput ?? {
-    text:
-      lastMessage?.role === "assistant"
-        ? lastMessage.content
-            .filter((b) => b.type === "text")
-            .map((b) => b.text)
-            .join("")
-        : "",
-    reasoning:
-      lastMessage?.role === "assistant"
-        ? lastMessage.content
-            .filter((b) => b.type === "thinking")
-            .map((b) => b.thinking)
-            .join("\n\n")
-        : "",
+    text: state?.output.text ?? "",
+    reasoning: state?.output.reasoning ?? "",
     isReasoning: Boolean(active),
   };
   useEffect(() => {
@@ -309,7 +281,7 @@ export default function Learning({
             {!introduced &&
             !state.completed &&
             !state.question &&
-            state.messages.length === 0 &&
+            state.messageCount === 0 &&
             state.status === "idle" ? (
               <div className="onboarding-welcome">
                 <div className="welcome-mark">
@@ -352,12 +324,9 @@ export default function Learning({
                       }
                       submit={async (answer) => {
                         if (!channel.current) throw new Error("会话尚未连接");
-                        const next = await channel.current.action<Conversation>(
-                          {
-                            action: "answer",
-                            toolCallId: state.question!.id,
-                            answer,
-                          },
+                        const next = await channel.current.answer(
+                          state.question!.id,
+                          answer,
                         );
                         receive(next);
                         setLiveOutput(null);
@@ -409,8 +378,7 @@ export default function Learning({
                                 state.completed && (!progress || progress.saved)
                                   ? correction.trim() || undefined
                                   : !state.completed &&
-                                      state.messages.at(-1)?.role ===
-                                        "assistant"
+                                      state.lastAssistant
                                     ? "请继续我们的交流。"
                                     : undefined,
                               )

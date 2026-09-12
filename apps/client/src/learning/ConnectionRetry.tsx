@@ -1,4 +1,4 @@
-import type { ModelRetryStatus } from "../api";
+import type { ModelRetryStatus } from "../domain/learning";
 
 export default function ConnectionRetry({
   status,

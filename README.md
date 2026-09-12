@@ -25,6 +25,10 @@
 - `apps/client/src/App.tsx`：页面布局、导航与连接状态。
 - `apps/client/src/account/`：账号状态、注册登录、个人资料和安全设置。
 - `apps/client/src/components/`：品牌、主题、背景和确认弹窗等公共控件。
+- `apps/client/src/pi/`：客户端 Agent 运行与教学编排，通过 `index.ts` 提供会话接口；不依赖 React 或具体网络传输。
+- `apps/client/src/learning/runtime.ts`：装配 PI 与业务能力，将建档消息转换为 UI 展示状态；`channel.ts` 和 `courses.ts` 负责业务同步与持久化。
+- `apps/client/src/domain/learning.ts`：UI、业务层与 PI 共用的学习数据类型，不包含 PI SDK 消息类型。
+- `apps/client/src/transport/`：模型流传输及共享账号身份状态；HTTP 请求与模型流使用同一账号切换版本。
 - `apps/client/src/api.ts` 与 `apps/client/src-tauri/src/account.rs`：浏览器及桌面请求、会话隔离与系统凭证存储。
 - `apps/server/cmd/api/`：服务启动、路由、中间件和账户请求处理，以及 HTTP 行为测试。
 - `apps/server/internal/data/`：用户、会话与验证码的数据操作，管理数据库结构和事务。

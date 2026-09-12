@@ -10,7 +10,7 @@ import {
 } from "../components/ai-elements/message";
 import { Shimmer } from "../components/ai-elements/shimmer";
 import { BrainIcon } from "lucide-react";
-import type { AssistantOutput } from "./session";
+import type { AssistantOutput } from "../domain/learning";
 
 export default function AssistantResponse({
   output,

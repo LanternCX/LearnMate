@@ -10,8 +10,8 @@ import {
   deleteCourse,
   listCourses,
   updateCourse,
-  type StoredCourse,
 } from "./learning/courses";
+import type { StoredCourse } from "./domain/learning";
 import "./workspace.css";
 
 const destinations: {

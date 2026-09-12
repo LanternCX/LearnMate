@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  CourseSession,
-  type CourseActivity,
-  type CourseMessage,
-  type Slide,
-} from "./course";
-import type { ModelInfo } from "./session";
+import type { CourseSession } from "../pi";
+import { createCourseSession } from "./runtime";
+import type {
+  CourseActivity,
+  CourseMessage,
+  Slide,
+  ModelInfo,
+  ModelRetryStatus,
+  CourseConversationState,
+  StoredCourse,
+} from "../domain/learning";
 import { MessageResponse } from "../components/ai-elements/message";
 import {
   Reasoning,
@@ -19,14 +23,11 @@ import SlideCanvas from "./SlideCanvas";
 import CourseLibrary from "./CourseLibrary";
 import Icon from "../components/Icon";
 import ConnectionRetry from "./ConnectionRetry";
-import type { ModelRetryStatus } from "../api";
 import {
   createCourse,
   emptyCourseState,
   saveCourseConversation,
   updateCourse,
-  type CourseConversationState,
-  type StoredCourse,
 } from "./courses";
 
 type RenderedCourseMessage = CourseMessage;
@@ -169,7 +170,7 @@ export default function Course({
     setActivity(null);
     setModelRetry(null);
     setError("");
-    const current = new CourseSession(
+    const current = createCourseSession(
       info,
       memory,
       (message, replaceLast) =>
