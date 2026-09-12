@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "知芽当前架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1160, 620]
+  },
+  "components": [
+    {
+      "id": "student",
+      "type": "external",
+      "label": "学生",
+      "sublabel": "浏览器或桌面端",
+      "pos": [40, 280],
+      "size": [130, 64]
+    },
+    {
+      "id": "client",
+      "type": "frontend",
+      "label": "学习界面",
+      "sublabel": "React · Web / Tauri",
+      "pos": [240, 280],
+      "size": [160, 64]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "教学 Agent",
+      "sublabel": "pi · 建档与课堂编排",
+      "pos": [470, 280],
+      "size": [170, 64]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "知芽服务",
+      "sublabel": "Go · 身份与会话",
+      "pos": [710, 280],
+      "size": [160, 64]
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "账号 · 会话 · 学习状态",
+      "pos": [960, 280],
+      "size": [160, 64]
+    },
+    {
+      "id": "model",
+      "type": "cloud",
+      "label": "模型服务",
+      "sublabel": "OpenAI-compatible",
+      "pos": [710, 90],
+      "size": [160, 64]
+    },
+    {
+      "id": "mail",
+      "type": "external",
+      "label": "邮件服务",
+      "sublabel": "SMTP",
+      "pos": [710, 470],
+      "size": [160, 64]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "知芽客户端",
+      "wraps": ["client", "agent"],
+      "pad": 30
+    },
+    {
+      "kind": "region",
+      "label": "服务端",
+      "wraps": ["server", "database"],
+      "pad": 30
+    }
+  ],
+  "connections": [
+    {
+      "id": "student-client",
+      "from": "student",
+      "to": "client",
+      "variant": "emphasis"
+    },
+    {
+      "id": "client-agent",
+      "from": "client",
+      "to": "agent",
+      "label": "学习交互",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-server",
+      "from": "agent",
+      "to": "server",
+      "label": "WebSocket · HTTP · 模型流",
+      "labelDy": 56,
+      "variant": "emphasis"
+    },
+    {
+      "id": "server-database",
+      "from": "server",
+      "to": "database",
+      "label": "保存与同步",
+      "variant": "emphasis"
+    },
+    {
+      "id": "server-model",
+      "from": "server",
+      "to": "model",
+      "label": "流式模型请求",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "server-mail",
+      "from": "server",
+      "to": "mail",
+      "label": "发送验证邮件",
+      "labelDy": 24,
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ]
+}
