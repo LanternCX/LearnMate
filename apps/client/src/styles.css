@@ -16,6 +16,7 @@
   --error: #a23f38;
   --subtle: #f2f5ef;
   --canvas-fill: radial-gradient(ellipse at 8% 0%, #fafaf0 0%, transparent 45%), radial-gradient(ellipse at 95% 95%, #b1c8b5 0%, transparent 54%), linear-gradient(120deg, #e6ede8, #d3dfd6 65%, #e3e9da);
+  --workspace-fill: #e6ede8;
   --glass: rgb(247 250 246 / 76%);
   --glass-edge: rgb(255 255 255 / 85%);
   --glass-shadow: 0 12px 32px -16px rgb(29 64 48 / 26%), inset 0 1px 0 rgb(255 255 255 / 65%);
@@ -659,6 +660,7 @@ footer {
     --error: #f2aaa0;
     --subtle: #34423d;
     --canvas-fill: radial-gradient(ellipse at 95% 100%, #354d3e 0%, transparent 60%), radial-gradient(ellipse at 0% 0%, #334638 0%, transparent 45%), #17211f;
+    --workspace-fill: #17211f;
     --glass: rgb(37 54 48 / 76%);
     --glass-edge: rgb(198 216 203 / 24%);
     --glass-shadow: 0 12px 32px -16px rgb(0 0 0 / 65%), inset 0 1px 0 rgb(198 216 203 / 10%);
