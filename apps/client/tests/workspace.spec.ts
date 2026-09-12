@@ -125,6 +125,68 @@ test("mobile destinations show honest empty states and account pages can open th
   await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
 });
 
+test("learning and profile pages share a solid theme background", async ({
+  page,
+}) => {
+  await page.route("**/api/me", (route) =>
+    route.fulfill({
+      json: {
+        id: "student",
+        nickname: "小芽",
+        email: "student@example.com",
+        avatar: "",
+      },
+    }),
+  );
+  const state = {
+    id: "session",
+    purpose: "onboarding",
+    messages: [],
+    completed: true,
+    memory: "喜欢动手尝试",
+    memoryVersion: 1,
+    messageSequence: 0,
+    revision: 0,
+    status: "idle",
+    leaseUntil: "",
+    question: null,
+  };
+  await page.route("**/api/learning/model", (route) =>
+    route.fulfill({ json: { available: false } }),
+  );
+  await mockLearning(page, () => state);
+  await page.goto("/");
+
+  const workspace = page.locator(".workspace");
+  const background = async () =>
+    workspace.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        image: style.backgroundImage,
+        token: getComputedStyle(document.documentElement)
+          .getPropertyValue("--workspace-fill")
+          .trim(),
+      };
+    });
+
+  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
+  expect(await background()).toEqual({ image: "none", token: "#e6ede8" });
+
+  await page.getByRole("button", { name: "用户菜单" }).click();
+  await page.getByRole("button", { name: "学习档案", exact: true }).click();
+  await expect(page.getByRole("region", { name: "学习档案" })).toBeVisible();
+  expect(await background()).toEqual({ image: "none", token: "#e6ede8" });
+
+  await page.getByRole("button", { name: "用户菜单" }).click();
+  await page
+    .getByRole("button", { name: "当前为自动主题，切换至浅色主题" })
+    .click();
+  await page
+    .getByRole("button", { name: "当前为浅色主题，切换至深色主题" })
+    .click();
+  expect(await background()).toEqual({ image: "none", token: "#17211f" });
+});
+
 test("onboarding blocks navigation until completion, including reload and waiting", async ({
   page,
 }) => {

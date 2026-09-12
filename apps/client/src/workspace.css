@@ -19,7 +19,7 @@
   display: grid;
   grid-template-columns: 224px minmax(0, 1fr);
   height: 100dvh;
-  background: var(--canvas-fill);
+  background: var(--workspace-fill);
 }
 .workspace-sidebar {
   position: relative;
