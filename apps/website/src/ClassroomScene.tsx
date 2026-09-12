@@ -70,7 +70,7 @@ export default function ClassroomScene() {
     const plotWidth = Math.min(width - (narrow ? 72 : 160), 760);
     const left = (width - plotWidth) / 2;
     const bottom = height - (narrow ? 134 : 126);
-    const top = Math.min(narrow ? 308 : 324, bottom - 100);
+    const top = Math.min(78, bottom - 100);
     const plotHeight = Math.max(100, bottom - top);
     const x = (value: number) => left + value / 10 * plotWidth;
     const y = (value: number) => bottom - value / 8 * plotHeight;

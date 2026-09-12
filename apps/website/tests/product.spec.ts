@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
 
-test("content and footer share one uninterrupted green gradient", async ({ page }) => {
+test("green neobrutalism has a grid hero and visible bounded controls", async ({ page }) => {
   await page.goto("./");
-  await expect(page.locator("body")).toHaveCSS("background-image", /linear-gradient/);
-  await expect(page.locator("body")).toHaveCSS("background-attachment", "scroll");
-  for (const selector of [".site-content", ".site-footer"]) {
-    await expect(page.locator(selector)).toHaveCSS("background-image", "none");
-    await expect(page.locator(selector)).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  }
+  await expect(page.locator(".hero")).toHaveCSS("background-image", /linear-gradient/);
+  const action = page.getByRole("link", { name: "了解知芽", exact: true });
+  await expect(action).toHaveCSS("border-top-width", "2px");
+  await expect(action).not.toHaveCSS("box-shadow", "none");
+  await action.focus();
+  await expect(action).toBeFocused();
 });
 
-test("product entry is reserved and grade selection shows one unframed explanation", async ({ page }) => {
+test("product entry is reserved and grade selection remains keyboard accessible", async ({ page }) => {
   await page.goto("./");
   const address = page.url();
   for (const entry of await page.getByRole("button", { name: "进入知芽", exact: true }).all()) {
@@ -27,11 +27,6 @@ test("product entry is reserved and grade selection shows one unframed explanati
   await expect(page.locator("#lesson .teaching-media")).toBeVisible();
   await expect(page.locator(".teaching-media img")).toHaveCount(0);
   await expect(page.locator(".lesson-ring, .lesson-dot")).toHaveCount(0);
-  for (const region of await page.locator(".stage-detail, .modality-grid article, .lesson-copy").all()) {
-    await expect(region).toHaveCSS("background-image", "none");
-    await expect(region).toHaveCSS("box-shadow", "none");
-    await expect(region).toHaveCSS("border-top-width", "0px");
-  }
 });
 
 test("classroom steps work without navigating and the FAQ is removed", async ({ page }) => {
@@ -61,8 +56,6 @@ test("grade and modality sections reserve blank real-image areas with black ligh
   for (const media of await page.locator("#multimodal .teaching-media").all()) {
     await expect(media).toBeVisible();
     await expect(media.locator("img")).toHaveCount(0);
-    await expect(media).toHaveCSS("box-shadow", "none");
-    await expect(media).toHaveCSS("border-top-width", "0px");
   }
   for (const text of await page.locator("#stages h3, #stages p, #multimodal h3, #multimodal p").all()) {
     await expect(text).toHaveCSS("color", "rgb(0, 0, 0)");

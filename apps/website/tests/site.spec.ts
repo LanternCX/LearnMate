@@ -32,6 +32,10 @@ test("presents learning modes and navigates to multimodal teaching", async ({
 test("can pause, seek, and replay the mathematical animation", async ({ page }) => {
   await page.clock.install();
   await page.goto("./");
+  await page.keyboard.press("Escape");
+  await page.locator("canvas").scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "重新播放动画" }).click();
+  await page.clock.runFor(300);
   const canvas = page.locator("canvas");
   await page.getByRole("button", { name: "暂停动画", exact: true }).click();
   const paused = await canvas.evaluate((el: HTMLCanvasElement) => el.toDataURL());
@@ -117,13 +121,13 @@ test("closes phone navigation with Escape and returns keyboard focus", async ({ 
   await expect(page.getByRole("link", { name: "GitHub 仓库", exact: true })).toBeVisible();
 });
 
-for (const viewport of [{ width: 1440, height: 1000 }, { width: 1366, height: 768 }, { width: 390, height: 844 }, { width: 320, height: 740 }]) {
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 414, height: 896 }, { width: 390, height: 844 }, { width: 375, height: 812 }, { width: 320, height: 740 }]) {
   for (const colorScheme of ["light", "dark"] as const) {
     test(`renders readable content and teaching artwork at ${viewport.width}px in ${colorScheme}`, async ({ page }, testInfo) => {
       await page.setViewportSize(viewport);
       await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
       await page.goto("./");
-      await expect(page.getByRole("heading", { name: "课程、探索与实验", exact: true })).toBeInViewport();
+      await expect(page.getByRole("heading", { level: 1, name: "知芽" })).toBeInViewport();
       await expect(page.getByRole("img")).toBeVisible();
       await expect.poll(() => page.locator("canvas").evaluate((canvas: HTMLCanvasElement) => {
         const context = canvas.getContext("2d")!;
@@ -134,6 +138,8 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 1366, height: 76
       })).toBeGreaterThan(1000);
       const overflow = await page.locator("main, header, footer").evaluateAll(roots =>
         roots.flatMap(root => Array.from(root.querySelectorAll("*"))).filter(element => {
+          // These conveyors deliberately extend inside their clipped viewports.
+          if (element.closest(".hero-notes, .ribbon-window")) return false;
           const rect = element.getBoundingClientRect();
           return rect.width > 0 && (rect.left < -1 || rect.right > window.innerWidth + 1);
         }).map(element => element.tagName + "." + element.className),
