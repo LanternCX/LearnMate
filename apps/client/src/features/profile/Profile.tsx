@@ -1,28 +1,21 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
-import { Checkbox } from "../components/ui/checkbox";
-import {
-  api,
-  APIError,
-  type ModelRetryStatus,
-  type User,
-} from "../api";
-import {
-  correctionProgress,
-  LearningSession,
-  type Conversation,
-  type ModelInfo,
-  type Question,
-  type AssistantOutput,
-} from "./session";
-import { ConversationChannel } from "./channel";
-import "./learning.css";
-import Mark from "../components/Mark";
-import Icon from "../components/Icon";
-import Course from "./CourseRoom";
-import type { StoredCourse } from "./courses";
-import { Spinner } from "../components/ui/spinner";
-import ConnectionRetry from "./ConnectionRetry";
+import { RadioGroup, RadioGroupItem } from "../../components/ui/radio-group";
+import { Checkbox } from "../../components/ui/checkbox";
+import { api, APIError, type User } from "../../api";
+import type {
+  ModelRetryStatus,
+  ConversationView as Conversation,
+  ModelInfo,
+  Question,
+  AssistantOutput,
+} from "../../domain/learning";
+import type { ProfileSession } from "../../pi";
+import { ProfileConnection } from "./runtime";
+import "./profile.css";
+import Mark from "../../components/Mark";
+import Icon from "../../components/Icon";
+import { Spinner } from "../../components/ui/spinner";
+import ConnectionRetry from "../../components/ConnectionRetry";
 import {
   PromptInput,
   PromptInputFooter,
@@ -30,16 +23,16 @@ import {
   PromptInputTextarea,
   PromptInputProvider,
   usePromptInputController,
-} from "../components/ai-elements/prompt-input";
+} from "../../components/ai-elements/prompt-input";
 
 const AssistantResponse = lazy(() => import("./AssistantResponse"));
 const MessageResponse = lazy(() =>
-  import("../components/ai-elements/message").then((module) => ({
+  import("../../components/ai-elements/message").then((module) => ({
     default: module.MessageResponse,
   })),
 );
 
-export default function Learning({
+export default function Profile({
   user,
   memoryOpen,
   editing,
@@ -47,7 +40,7 @@ export default function Learning({
   ending,
   setEnding,
   onOnboardingChange,
-  courseLibrary,
+  onContextChange,
   visible = true,
 }: {
   user: User;
@@ -57,18 +50,7 @@ export default function Learning({
   ending: boolean;
   setEnding: (value: boolean) => void;
   onOnboardingChange: (value: boolean) => void;
-  courseLibrary: {
-    courses: StoredCourse[];
-    activeCourse: StoredCourse | null;
-    coursesReady: boolean;
-    roomToken: number;
-    error: string;
-    onOpen: (course: StoredCourse) => void;
-    onRename: (course: StoredCourse, title: string) => Promise<boolean>;
-    onDelete: (course: StoredCourse) => Promise<boolean>;
-    onCourseCreated: (course: StoredCourse) => void;
-    onCourseUpdated: (course: StoredCourse) => void;
-  };
+  onContextChange: (context: { memory: string; model: ModelInfo | null }) => void;
   visible?: boolean;
 }) {
   const [state, setState] = useState<Conversation | null>(null);
@@ -83,8 +65,8 @@ export default function Learning({
   const [stopped, setStopped] = useState(false);
   const paused = useRef(false);
   const [introduced, setIntroduced] = useState(false);
-  const session = useRef<LearningSession | null>(null);
-  const channel = useRef<ConversationChannel | null>(null);
+  const session = useRef<ProfileSession | null>(null);
+  const channel = useRef<ProfileConnection | null>(null);
   const generation = useRef(0);
   const latest = useRef<Conversation | null>(null);
   const alive = useRef(true);
@@ -103,9 +85,8 @@ export default function Learning({
   const run = async (model: ModelInfo, text?: string) => {
     if (session.current || !channel.current || !alive.current) return false;
     const epoch = generation.current;
-    const current = new LearningSession(
+    const current = channel.current.createSession(
       model,
-      channel.current,
       (next) => {
         if (generation.current === epoch) receive(next);
       },
@@ -156,9 +137,7 @@ export default function Learning({
     paused.current = true;
     session.current?.stop();
     void channel.current
-      ?.action<Conversation>({
-        action: "end_correction",
-      })
+      ?.endCorrection()
       .then((next) => {
         if (!alive.current) return;
         receive(next);
@@ -191,7 +170,7 @@ export default function Learning({
     alive.current = true;
     let disposed = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    const connection = new ConversationChannel();
+    const connection = new ProfileConnection();
     channel.current = connection;
     const unsubscribe = connection.subscribe((next) => {
       if (disposed) return;
@@ -205,15 +184,8 @@ export default function Learning({
         ]);
         if (disposed) return;
         receive(initial);
-        if (
-          correctionProgress(initial) &&
-          !correctionProgress(initial)?.saved
-        ) {
-          receive(
-            await connection.action<Conversation>({
-              action: "end_correction",
-            }),
-          );
+        if (initial.correction && !initial.correction.saved) {
+          receive(await connection.endCorrection());
         }
         setInfo(model);
         if (
@@ -244,28 +216,18 @@ export default function Learning({
       if (channel.current === connection) channel.current = null;
     };
   }, [user.id]);
+  useEffect(() => {
+    if (state) onContextChange({ memory: state.memory, model: info });
+  }, [state?.memory, info, onContextChange]);
   const active =
     !stopped &&
     (running ||
       (state?.status === "running" &&
         Date.parse(state.leaseUntil) > Date.now()));
-  const progress = state ? correctionProgress(state) : null;
-  const lastMessage = state?.messages.at(-1);
+  const progress = state?.correction;
   const output = liveOutput ?? {
-    text:
-      lastMessage?.role === "assistant"
-        ? lastMessage.content
-            .filter((b) => b.type === "text")
-            .map((b) => b.text)
-            .join("")
-        : "",
-    reasoning:
-      lastMessage?.role === "assistant"
-        ? lastMessage.content
-            .filter((b) => b.type === "thinking")
-            .map((b) => b.thinking)
-            .join("\n\n")
-        : "",
+    text: state?.output.text ?? "",
+    reasoning: state?.output.reasoning ?? "",
     isReasoning: Boolean(active),
   };
   useEffect(() => {
@@ -281,7 +243,7 @@ export default function Learning({
     <section
       className="learning-surface"
       data-hidden={!visible}
-      aria-label="学习空间"
+      aria-label="建档与档案维护"
     >
       {!state ? (
         <div className="learning-loading">
@@ -289,27 +251,11 @@ export default function Learning({
         </div>
       ) : (
         <>
-          {state.completed && !memoryOpen && (
-            <Course
-              info={info}
-              memory={state.memory}
-              courses={courseLibrary.courses}
-              activeCourse={courseLibrary.activeCourse}
-              coursesReady={courseLibrary.coursesReady}
-              roomToken={courseLibrary.roomToken}
-              libraryError={courseLibrary.error}
-              onOpenCourse={courseLibrary.onOpen}
-              onRenameCourse={courseLibrary.onRename}
-              onDeleteCourse={courseLibrary.onDelete}
-              onCourseCreated={courseLibrary.onCourseCreated}
-              onCourseUpdated={courseLibrary.onCourseUpdated}
-            />
-          )}
           <div hidden={state.completed && (!memoryOpen || editing)}>
             {!introduced &&
             !state.completed &&
             !state.question &&
-            state.messages.length === 0 &&
+            state.messageCount === 0 &&
             state.status === "idle" ? (
               <div className="onboarding-welcome">
                 <div className="welcome-mark">
@@ -352,12 +298,9 @@ export default function Learning({
                       }
                       submit={async (answer) => {
                         if (!channel.current) throw new Error("会话尚未连接");
-                        const next = await channel.current.action<Conversation>(
-                          {
-                            action: "answer",
-                            toolCallId: state.question!.id,
-                            answer,
-                          },
+                        const next = await channel.current.answer(
+                          state.question!.id,
+                          answer,
                         );
                         receive(next);
                         setLiveOutput(null);
@@ -409,8 +352,7 @@ export default function Learning({
                                 state.completed && (!progress || progress.saved)
                                   ? correction.trim() || undefined
                                   : !state.completed &&
-                                      state.messages.at(-1)?.role ===
-                                        "assistant"
+                                      state.lastAssistant
                                     ? "请继续我们的交流。"
                                     : undefined,
                               )

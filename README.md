@@ -23,8 +23,18 @@
 代码按客户端与服务端组织：
 
 - `apps/client/src/App.tsx`：页面布局、导航与连接状态。
-- `apps/client/src/account/`：账号状态、注册登录、个人资料和安全设置。
+- `apps/client/src/features/account/`：账号状态、注册登录、个人资料和安全设置。
 - `apps/client/src/components/`：品牌、主题、背景和确认弹窗等公共控件。
+- `apps/client/src/pi/`：客户端 Agent 运行与教学编排，通过 `index.ts` 提供会话接口；不依赖 React 或具体网络传输。
+- `apps/client/src/pi/agent/`：只维护具体 Agent，每个文件包含对应的 System Prompt、工具清单与创建配置。
+- `apps/client/src/pi/tools/`：只维护具体工具，每个文件按工具名称命名，包含参数、专属类型、描述与执行逻辑。
+- `apps/client/src/pi/agent.ts` 和 `tool.ts`：分别统筹公共 Agent 创建与模型流适配，以及工具结果接入和共享类型，保留现有通信协议。
+- `apps/client/src/pi/sessions/`：协调建档恢复、执行权、停止、课件并发和讲解同步，通过 Agent 工厂启动各场景。
+- `apps/client/src/features/profile/`：学生建档与 Memory 维护，包括档案界面、会话接入和 WebSocket 同步；对应 PI 的 `ProfileSession`。
+- `apps/client/src/features/course/`：课程列表与动态课堂，Workspace 直接接入 `CourseRoom`；`runtime.ts` 接入 `CourseSession`，`courses.ts` 负责课程持久化。
+- `Workspace` 组合档案与课堂入口，依据建档完成状态开放学习，并把保存的 Memory 作为课堂上下文传入；两个业务不互相管理会话。
+- `apps/client/src/domain/learning.ts`：UI、业务层与 PI 共用的学习数据类型，不包含 PI SDK 消息类型。
+- `apps/client/src/transport/`：模型流传输及共享账号身份状态；HTTP 请求与模型流使用同一账号切换版本。
 - `apps/client/src/api.ts` 与 `apps/client/src-tauri/src/account.rs`：浏览器及桌面请求、会话隔离与系统凭证存储。
 - `apps/server/cmd/api/`：服务启动、路由、中间件和账户请求处理，以及 HTTP 行为测试。
 - `apps/server/internal/data/`：用户、会话与验证码的数据操作，管理数据库结构和事务。
@@ -33,7 +43,7 @@
 - `apps/server/config.yaml`：后端部署配置，由 Go 的 `internal/config` 加载和校验。
 - `dev-services.env`：本地 Docker 基础设施配置。
 
-需要 Node.js 22.12+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
+需要 Node.js 22.19+、npm、Go 1.26+；桌面开发还需要 Rust 和对应系统的 [Tauri 开发环境](https://v2.tauri.app/start/prerequisites/)。在仓库根目录安装依赖：
 
 ```sh
 npm install

@@ -1,10 +1,10 @@
 import { usePolicy } from "./Policy";
-import { api } from "../api";
-import type { User } from "../api";
+import { api } from "../../api";
+import type { User } from "../../api";
 import { Field, Form } from "./Form";
 import type { AccountController } from "./useAccount";
 import { useEffect, useRef } from "react";
-import Mark from "../components/Mark";
+import Mark from "../../components/Mark";
 type Props = Pick<
   AccountController,
   | "busy"

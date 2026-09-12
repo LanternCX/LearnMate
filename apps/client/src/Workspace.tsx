@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { useAccount } from "./account/useAccount";
-import Profile from "./account/Profile";
-import Security from "./account/Security";
-import Learning from "./learning/Learning";
+import type { useAccount } from "./features/account/useAccount";
+import AccountProfile from "./features/account/Profile";
+import Security from "./features/account/Security";
+import CourseRoom from "./features/course/CourseRoom";
+import Profile from "./features/profile/Profile";
 import Mark from "./components/Mark";
 import Icon, { type IconName } from "./components/Icon";
 import ThemeToggle from "./components/ThemeToggle";
@@ -10,8 +11,8 @@ import {
   deleteCourse,
   listCourses,
   updateCourse,
-  type StoredCourse,
-} from "./learning/courses";
+} from "./features/course/courses";
+import type { ModelInfo, StoredCourse } from "./domain/learning";
 import "./workspace.css";
 
 const destinations: {
@@ -40,6 +41,10 @@ export default function Workspace({
   const [editingMemory, setEditingMemory] = useState(true);
   const [endingMemory, setEndingMemory] = useState(false);
   const [onboarding, setOnboarding] = useState(true);
+  const [learningContext, setLearningContext] = useState<{
+    memory: string;
+    model: ModelInfo | null;
+  }>({ memory: "", model: null });
   const [destination, setDestination] = useState(destinations[0]);
   const [courses, setCourses] = useState<StoredCourse[]>([]);
   const [activeCourse, setActiveCourse] = useState<StoredCourse | null>(null);
@@ -319,11 +324,11 @@ export default function Workspace({
             </div>
           )}
           {feedback}
-          <Learning
+          <Profile
             user={user}
             visible={
               onboarding ||
-              (view === "home" && (memoryOpen || destination.id === "learning"))
+              (view === "home" && memoryOpen)
             }
             memoryOpen={!onboarding && memoryOpen}
             editing={editingMemory}
@@ -331,35 +336,46 @@ export default function Workspace({
             ending={endingMemory}
             setEnding={setEndingMemory}
             onOnboardingChange={setOnboarding}
-            courseLibrary={{
-              courses,
-              activeCourse,
-              coursesReady,
-              roomToken: courseRoomToken,
-              error: courseError,
-              onOpen: (course) => {
-                setActiveCourse(course);
-                setCourseRoomToken((value) => value + 1);
-              },
-              onRename: renameCourse,
-              onDelete: removeCourse,
-              onCourseCreated: (course) => {
-                setCourses((all) => [
-                  course,
-                  ...all.filter((item) => item.id !== course.id),
-                ]);
-                setActiveCourse(course);
-              },
-              onCourseUpdated: (course) => {
-                setCourses((all) =>
-                  all.map((item) => (item.id === course.id ? course : item)),
-                );
-                setActiveCourse((current) =>
-                  current?.id === course.id ? course : current,
-                );
-              },
-            }}
+            onContextChange={setLearningContext}
           />
+          {!onboarding && !memoryOpen && (
+            <section
+              className="course-surface"
+              data-hidden={view !== "home" || destination.id !== "learning"}
+              aria-label="学习空间"
+            >
+              <CourseRoom
+                info={learningContext.model}
+                memory={learningContext.memory}
+                courses={courses}
+                activeCourse={activeCourse}
+                coursesReady={coursesReady}
+                roomToken={courseRoomToken}
+                libraryError={courseError}
+                onOpenCourse={(course) => {
+                  setActiveCourse(course);
+                  setCourseRoomToken((value) => value + 1);
+                }}
+                onRenameCourse={renameCourse}
+                onDeleteCourse={removeCourse}
+                onCourseCreated={(course) => {
+                  setCourses((all) => [
+                    course,
+                    ...all.filter((item) => item.id !== course.id),
+                  ]);
+                  setActiveCourse(course);
+                }}
+                onCourseUpdated={(course) => {
+                  setCourses((all) =>
+                    all.map((item) => (item.id === course.id ? course : item)),
+                  );
+                  setActiveCourse((current) =>
+                    current?.id === course.id ? course : current,
+                  );
+                }}
+              />
+            </section>
+          )}
           {!onboarding &&
             !memoryOpen &&
             view === "home" &&
@@ -381,7 +397,7 @@ export default function Workspace({
             <section key={view} className="workspace-settings">
               <h1>{titles[view]}</h1>
               {view === "profile" ? (
-                <Profile {...account} user={user} />
+                <AccountProfile {...account} user={user} />
               ) : (
                 <>
                   <Security {...account} user={user} />

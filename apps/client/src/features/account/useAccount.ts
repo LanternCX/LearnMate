@@ -1,9 +1,10 @@
 import type { AccountPolicy } from "./Policy";
 import { useEffect, useRef, useState } from "react";
-import { api, APIError, setActiveUser } from "../api";
-import type { User } from "../api";
+import { api, APIError } from "../../api";
+import { setActiveUser } from "../../transport/identity";
+import type { User } from "../../api";
 import type { Flow, View } from "./types";
-import type { ConfirmationOptions } from "../components/Confirmation";
+import type { ConfirmationOptions } from "../../components/Confirmation";
 
 export function useAccount() {
   const [policy, setPolicy] = useState<AccountPolicy | null>(null);

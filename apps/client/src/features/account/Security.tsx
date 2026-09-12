@@ -1,6 +1,6 @@
-import { api } from "../api";
+import { api } from "../../api";
 import { useId, useState } from "react";
-import type { User } from "../api";
+import type { User } from "../../api";
 import { CodeField, Field, Form, NewPasswordFields, Password } from "./Form";
 import type { AccountController } from "./useAccount";
 import { useVerification, VerificationActions, VerificationHelp } from "./Verification";

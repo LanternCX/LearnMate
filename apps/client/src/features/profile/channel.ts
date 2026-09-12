@@ -1,5 +1,6 @@
-import { APIError, api } from "../api";
-import type { Conversation } from "./session";
+import { APIError, api } from "../../api";
+import type { Conversation, ConversationStore } from "../../pi";
+import type { Answer } from "../../domain/learning";
 
 type Pending = {
   action: object;
@@ -16,7 +17,7 @@ type ServerMessage = {
   error?: string;
 };
 
-export class ConversationChannel {
+export class ConversationChannel implements ConversationStore {
   private socket: WebSocket | null = null;
   private connecting: Promise<Conversation> | null = null;
   private latest: Conversation | null = null;
@@ -29,6 +30,42 @@ export class ConversationChannel {
     this.listeners.add(listener);
     if (this.latest) listener(this.latest);
     return () => this.listeners.delete(listener);
+  }
+
+  claim(correction?: { correctionText: string; revision: number }) {
+    return this.action<{ runId: string }>({ action: "claim", ...correction });
+  }
+
+  answer(toolCallId: string, answer: Answer) {
+    return this.action<Conversation>({ action: "answer", toolCallId, answer });
+  }
+
+  endCorrection() {
+    return this.action<Conversation>({ action: "end_correction" });
+  }
+
+  release(runId: string) {
+    return this.action({ action: "release", runId });
+  }
+
+  heartbeat(runId: string) {
+    return this.action({ action: "heartbeat", runId });
+  }
+
+  saveMessage(runId: string, message: Conversation["messages"][number]) {
+    return this.action({ action: "message", runId, message });
+  }
+
+  executeTool(runId: string, toolCallId: string) {
+    return this.action<Awaited<ReturnType<ConversationStore["executeTool"]>>>({
+      action: "tool",
+      runId,
+      toolCallId,
+    });
+  }
+
+  recordToolError(runId: string, toolCallId: string) {
+    return this.action({ action: "tool_error", runId, toolCallId });
   }
 
   open(): Promise<Conversation> {
@@ -55,7 +92,7 @@ export class ConversationChannel {
     });
   }
 
-  action<T>(action: object): Promise<T> {
+  private action<T>(action: object): Promise<T> {
     if (this.socket?.readyState === WebSocket.OPEN)
       return this.enqueue<T>(action);
     return this.open().then(() => this.enqueue<T>(action));

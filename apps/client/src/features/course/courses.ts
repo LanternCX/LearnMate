@@ -1,37 +1,9 @@
-import { api } from "../api";
-import type { CourseMessage, Slide } from "./course";
-
-export type CourseConversationState = {
-  messages: CourseMessage[];
-  slides: Slide[];
-  presentedSlideIds: string[];
-  currentSlideId: string;
-};
-
-export type CourseCover = {
-  motif:
-    | "code"
-    | "orbit"
-    | "geometry"
-    | "language"
-    | "nature"
-    | "history"
-    | "abstract";
-  palette: "sprout" | "sunrise" | "ocean" | "berry" | "clay";
-  label: string;
-};
-
-export type StoredCourse = {
-  id: string;
-  conversationId: string;
-  title: string;
-  topic: string;
-  cover: CourseCover;
-  status: "active";
-  state: CourseConversationState;
-  createdAt: string;
-  updatedAt: string;
-};
+import { api } from "../../api";
+import type {
+  CourseConversationState,
+  CourseCover,
+  StoredCourse,
+} from "../../domain/learning";
 
 export const emptyCourseState = (): CourseConversationState => ({
   messages: [],

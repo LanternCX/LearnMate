@@ -2,15 +2,15 @@ import {
   Reasoning,
   ReasoningContent,
   ReasoningTrigger,
-} from "../components/ai-elements/reasoning";
+} from "../../components/ai-elements/reasoning";
 import {
   Message,
   MessageContent,
   MessageResponse,
-} from "../components/ai-elements/message";
-import { Shimmer } from "../components/ai-elements/shimmer";
+} from "../../components/ai-elements/message";
+import { Shimmer } from "../../components/ai-elements/shimmer";
 import { BrainIcon } from "lucide-react";
-import type { AssistantOutput } from "./session";
+import type { AssistantOutput } from "../../domain/learning";
 
 export default function AssistantResponse({
   output,
