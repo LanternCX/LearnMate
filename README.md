@@ -46,7 +46,7 @@
 
 ![知芽当前架构](docs/assets/zhiya-architecture.svg)
 
-教学 Agent 运行在客户端，负责建档、课堂对话与课件编排；Go 服务负责身份、会话同步、数据持久化和模型代理，模型密钥不会进入客户端。图中只展示当前已经接入的主要组件，规划中的实验室、在线评测和对象存储暂未列入。
+浏览器和 Tauri 桌面应用共享由 React、TypeScript 与 Vite 构建的学习界面，pi Agent 在客户端负责建档、课堂对话和课件编排。Go 服务提供静态文件、API、WebSocket 会话同步与模型代理，模型密钥不会进入客户端。本地开发通过 Docker Compose 运行 PostgreSQL 17 和 Mailpit；部署环境连接独立的 PostgreSQL、SMTP 与 OpenAI-compatible 模型服务。
 
 架构图使用 [Archify](https://github.com/tt-a1i/archify) 生成，可维护源文件见 [`docs/assets/zhiya-architecture.architecture.json`](docs/assets/zhiya-architecture.architecture.json)。
 

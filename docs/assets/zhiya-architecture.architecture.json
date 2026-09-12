@@ -2,126 +2,170 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "知芽当前架构",
+    "title": "知芽技术架构",
     "locale": "zh-CN",
     "quality_profile": "showcase",
-    "viewBox": [1160, 620]
+    "legend": {
+      "mode": "hidden"
+    },
+    "viewBox": [1360, 800]
   },
   "components": [
     {
       "id": "student",
       "type": "external",
       "label": "学生",
-      "sublabel": "浏览器或桌面端",
-      "pos": [40, 280],
-      "size": [130, 64]
+      "sublabel": "学习与互动",
+      "pos": [30, 330],
+      "size": [120, 64]
     },
     {
-      "id": "client",
+      "id": "ui",
       "type": "frontend",
-      "label": "学习界面",
-      "sublabel": "React · Web / Tauri",
-      "pos": [240, 280],
-      "size": [160, 64]
+      "label": "React 学习界面",
+      "sublabel": "React 19 · TypeScript 7 · Vite 8",
+      "pos": [230, 240],
+      "size": [190, 72]
     },
     {
       "id": "agent",
       "type": "backend",
-      "label": "教学 Agent",
-      "sublabel": "pi · 建档与课堂编排",
-      "pos": [470, 280],
-      "size": [170, 64]
+      "label": "pi Agent",
+      "sublabel": "建档 · 教学 · 课件编排",
+      "pos": [230, 440],
+      "size": [190, 72]
+    },
+    {
+      "id": "transport",
+      "type": "messagebus",
+      "label": "客户端传输层",
+      "sublabel": "HTTP API · WebSocket · 模型流",
+      "pos": [520, 340],
+      "size": [190, 78]
     },
     {
       "id": "server",
       "type": "backend",
-      "label": "知芽服务",
-      "sublabel": "Go · 身份与会话",
-      "pos": [710, 280],
-      "size": [160, 64]
-    },
-    {
-      "id": "database",
-      "type": "database",
-      "label": "PostgreSQL",
-      "sublabel": "账号 · 会话 · 学习状态",
-      "pos": [960, 280],
-      "size": [160, 64]
+      "label": "Go 服务",
+      "sublabel": "静态文件 · API · 会话 · 模型代理",
+      "pos": [790, 340],
+      "size": [190, 78]
     },
     {
       "id": "model",
       "type": "cloud",
       "label": "模型服务",
       "sublabel": "OpenAI-compatible",
-      "pos": [710, 90],
+      "pos": [805, 120],
       "size": [160, 64]
     },
     {
-      "id": "mail",
+      "id": "smtp",
       "type": "external",
-      "label": "邮件服务",
-      "sublabel": "SMTP",
-      "pos": [710, 470],
+      "label": "SMTP 服务器",
+      "sublabel": "部署环境",
+      "pos": [1160, 340],
       "size": [160, 64]
+    },
+    {
+      "id": "postgres",
+      "type": "database",
+      "label": "PostgreSQL 17",
+      "sublabel": "账号 · 会话 · 学习状态",
+      "pos": [795, 650],
+      "size": [180, 64]
+    },
+    {
+      "id": "judge0",
+      "type": "backend",
+      "label": "Judge0",
+      "sublabel": "代码执行 · 判题",
+      "pos": [1110, 650],
+      "size": [180, 64]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "知芽客户端",
-      "wraps": ["client", "agent"],
-      "pad": 30
+      "label": "知芽客户端 · Web / Tauri 2 + Rust",
+      "wraps": ["ui", "agent", "transport"],
+      "pad": 28
     },
     {
       "kind": "region",
-      "label": "服务端",
-      "wraps": ["server", "database"],
-      "pad": 30
+      "label": "Docker 部署",
+      "wraps": ["postgres", "judge0"],
+      "pad": 28
     }
   ],
   "connections": [
     {
-      "id": "student-client",
+      "id": "student-ui",
       "from": "student",
-      "to": "client",
+      "to": "ui",
       "variant": "emphasis"
     },
     {
-      "id": "client-agent",
-      "from": "client",
+      "id": "ui-agent",
+      "from": "ui",
       "to": "agent",
-      "label": "学习交互",
+      "label": "教学交互",
+      "labelDy": 24,
+      "fromSide": "bottom",
+      "toSide": "top",
       "variant": "emphasis"
     },
     {
-      "id": "agent-server",
+      "id": "ui-transport",
+      "from": "ui",
+      "to": "transport",
+      "label": "HTTP · WebSocket",
+      "variant": "emphasis"
+    },
+    {
+      "id": "agent-transport",
       "from": "agent",
-      "to": "server",
-      "label": "WebSocket · HTTP · 模型流",
-      "labelDy": 56,
+      "to": "transport",
+      "label": "会话操作 · 模型流",
       "variant": "emphasis"
     },
     {
-      "id": "server-database",
-      "from": "server",
-      "to": "database",
-      "label": "保存与同步",
+      "id": "transport-server",
+      "from": "transport",
+      "to": "server",
+      "label": "HTTP · WS · 流式响应",
+      "labelDy": 60,
       "variant": "emphasis"
     },
     {
       "id": "server-model",
       "from": "server",
       "to": "model",
-      "label": "流式模型请求",
+      "label": "Chat Completions",
       "fromSide": "top",
       "toSide": "bottom"
     },
     {
-      "id": "server-mail",
+      "id": "server-smtp",
       "from": "server",
-      "to": "mail",
-      "label": "发送验证邮件",
-      "labelDy": 24,
+      "to": "smtp",
+      "label": "SMTP · 部署"
+    },
+    {
+      "id": "server-postgres",
+      "from": "server",
+      "to": "postgres",
+      "label": "SQL",
+      "labelDy": 36,
+      "labelDx": -32,
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "server-judge0",
+      "from": "server",
+      "to": "judge0",
+      "label": "代码提交 · 执行结果",
       "fromSide": "bottom",
       "toSide": "top"
     }
