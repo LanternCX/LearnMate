@@ -83,6 +83,22 @@ test("Pi resumes a persisted question across devices and saves memory before com
         JSON.stringify(m.content).includes("我现在更喜欢自己尝试"),
     );
     if (correctionIndex >= 0) {
+      if (
+        payload.tool_choice !== undefined &&
+        payload.tool_choice !== "auto" &&
+        payload.thinking?.type !== "disabled"
+      ) {
+        await route.fulfill({
+          status: 400,
+          json: {
+            error: {
+              message: "Thinking mode does not support this tool_choice",
+              type: "invalid_request_error",
+            },
+          },
+        });
+        return;
+      }
       correctionCall++;
       if (holdCorrection) {
         holdCorrection = false;

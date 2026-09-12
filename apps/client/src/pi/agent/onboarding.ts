@@ -62,6 +62,7 @@ export function createOnboardingAgent(options: {
     shouldStopAfterTurn: () => options.correcting && options.context().saved,
     request: (payload, signal) => {
       if (options.correcting) {
+        payload.thinking = { type: "disabled" };
         payload.tool_choice = options.context().answered
           ? "required"
           : { type: "function", function: { name: "ask_student" } };
