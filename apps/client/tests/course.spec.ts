@@ -75,8 +75,15 @@ test("a student runs a model-created coding page and receives a review only when
     }),
   );
   let submittedCode = "";
+  let runRequests = 0;
+  let releaseFirstRun = () => {};
+  const firstRunPending = new Promise<void>((resolve) => {
+    releaseFirstRun = resolve;
+  });
   await page.route("**/api/code/runs", async (route) => {
     submittedCode = route.request().postDataJSON().sourceCode;
+    runRequests++;
+    if (runRequests === 1) await firstRunPending;
     await route.fulfill({
       json: {
         stdout: "你好，知芽！\n",
@@ -159,6 +166,18 @@ test("a student runs a model-created coding page and receives a review only when
     await editor.evaluate((element) => document.activeElement === element),
   ).toBe(true);
   await page.getByRole("button", { name: "运行代码" }).click();
+  const runningButton = page.getByRole("button", { name: "代码正在运行" });
+  await expect(runningButton).toBeVisible();
+  await expect(runningButton).toBeDisabled();
+  await expect(runningButton).toHaveAttribute("aria-busy", "true");
+  const runSpinner = runningButton.locator("svg");
+  await expect(runSpinner).toBeVisible();
+  await expect(runSpinner).not.toHaveCSS("animation-name", "none");
+  await expect(page.getByText("运行中…", { exact: true })).toHaveCount(0);
+  releaseFirstRun();
+  await expect(
+    page.getByRole("button", { name: "运行代码" }),
+  ).toBeEnabled();
   await expect.poll(() => submittedCode).toBe("if True:\n    pass");
   await editor.press("Shift+Tab");
   await page.getByRole("button", { name: "运行代码" }).click();

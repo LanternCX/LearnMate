@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MessageResponse } from "../../components/ai-elements/message";
+import { Spinner } from "../../components/ui/spinner";
 import type { CodingExercise } from "../../domain/learning";
 import CodeEditor from "./CodeEditor";
 
@@ -82,13 +83,16 @@ export default function CodingPage({
       )}
       <footer className="coding-actions">
         <button
+          aria-busy={running}
+          aria-label={running ? "代码正在运行" : undefined}
+          className="coding-run-button"
           disabled={ended || running}
           onClick={() => {
             setRunning(true);
             void onRun().finally(() => setRunning(false));
           }}
         >
-          {running ? "运行中…" : "运行代码"}
+          {running ? <Spinner aria-hidden="true" /> : "运行代码"}
         </button>
         <button disabled={ended || running} onClick={() => void onEnd()}>
           {ended ? "练习已结束" : "结束练习"}

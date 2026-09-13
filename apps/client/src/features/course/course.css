@@ -763,6 +763,11 @@
   background: var(--accent);
   color: var(--on-accent);
 }
+.coding-page > .coding-actions .coding-run-button {
+  display: inline-grid;
+  min-width: 92px;
+  place-items: center;
+}
 .coding-page > .coding-actions button:disabled {
   opacity: 0.5;
 }
