@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MessageResponse } from "../../components/ai-elements/message";
 import type { CodingExercise } from "../../domain/learning";
 import CodeEditor from "./CodeEditor";
 
@@ -43,7 +44,9 @@ export default function CodingPage({
         </div>
         <span data-status={exercise.status}>{ended ? "已结束" : "练习中"}</span>
       </header>
-      <p className="coding-instructions">{exercise.instructions}</p>
+      <section className="coding-instructions" aria-label="题目说明">
+        <MessageResponse>{exercise.instructions}</MessageResponse>
+      </section>
       <section className="coding-editor-shell" aria-label="代码编辑区">
         <header className="coding-editor-bar">
           <span>{exerciseFilename(exercise.languageName)}</span>

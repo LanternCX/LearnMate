@@ -117,7 +117,8 @@ test("a student runs a model-created coding page and receives a review only when
       await route.fulfill(
         toolResponse("coding-page", "show_coding_exercise", {
           title: "打印一声问候",
-          instructions: "修改程序，让它输出：你好，知芽！",
+          instructions:
+            "**修改程序**，完成下面的任务：\n\n- 使用 `print` 输出：你好，知芽！",
           languageId: 71,
           languageName: "Python (3.8.1)",
           starterCode: "print('你好')",
@@ -141,6 +142,15 @@ test("a student runs a model-created coding page and receives a review only when
   await expect(
     page.getByText("Python (3.8.1)", { exact: true }),
   ).toBeVisible();
+  const instructions = page.getByRole("region", { name: "题目说明" });
+  const emphasisWeight = await instructions
+    .getByText("修改程序", { exact: true })
+    .evaluate((element) => Number(getComputedStyle(element).fontWeight));
+  expect(emphasisWeight).toBeGreaterThan(400);
+  await expect(
+    instructions.getByRole("listitem").getByText(/使用/),
+  ).toBeVisible();
+  await expect(instructions.locator("code")).toHaveText("print");
   const editor = page.getByRole("textbox", { name: "代码" });
   await editor.fill("if True:\n");
   await editor.press("Tab");
