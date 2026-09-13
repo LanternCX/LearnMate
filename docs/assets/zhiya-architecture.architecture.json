@@ -76,10 +76,10 @@
       "size": [180, 64]
     },
     {
-      "id": "judge0",
+      "id": "runner",
       "type": "backend",
-      "label": "Judge0",
-      "sublabel": "代码执行 · 判题",
+      "label": "go-judge",
+      "sublabel": "多语言沙箱执行",
       "pos": [1110, 650],
       "size": [180, 64]
     }
@@ -94,7 +94,7 @@
     {
       "kind": "region",
       "label": "Docker 部署",
-      "wraps": ["postgres", "judge0"],
+      "wraps": ["postgres", "runner"],
       "pad": 28
     }
   ],
@@ -162,9 +162,9 @@
       "toSide": "top"
     },
     {
-      "id": "server-judge0",
+      "id": "server-runner",
       "from": "server",
-      "to": "judge0",
+      "to": "runner",
       "label": "代码提交 · 执行结果",
       "fromSide": "bottom",
       "toSide": "top"

@@ -19,5 +19,34 @@ services:
     ports:
       - "${MAILPIT_SMTP_BIND:?Use npm run dev:services}:1025"
       - "${MAILPIT_HTTP_BIND:?Use npm run dev:services}:8025"
+  runner:
+    build:
+      context: apps/runner
+    ports:
+      - "${RUNNER_BIND:?Use npm run dev:services}:5050"
+    privileged: true
+    cgroup: host
+    restart: unless-stopped
+    read_only: true
+    mem_limit: 2g
+    pids_limit: 512
+    shm_size: 256m
+    command:
+      - -http-addr
+      - 0.0.0.0:5050
+      - -parallelism
+      - "4"
+      - -output-limit
+      - "67108864"
+      - -copy-out-limit
+      - "67108864"
+    tmpfs:
+      - /run
+      - /tmp
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:5050/version"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
 volumes:
   postgres-data:

@@ -453,7 +453,7 @@ rect.c-bg-rect { fill: var(--bg); }
         <path data-edge-from="server" data-edge-to="model" data-edge-label="Chat Completions" data-edge-key="5" data-edge-id="server-model" data-composition-points="885,340;885,184" d="M 885 340 L 885 184" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="server" data-edge-to="smtp" data-edge-label="SMTP · 部署" data-edge-key="6" data-edge-id="server-smtp" data-composition-points="980,379;1160,379" d="M 980 379 L 1160 379" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="server" data-edge-to="postgres" data-edge-label="SQL" data-edge-key="7" data-edge-id="server-postgres" data-composition-points="878,418;878,650" d="M 878 418 L 878 650" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="server" data-edge-to="judge0" data-edge-label="代码提交 · 执行结果" data-edge-key="8" data-edge-id="server-judge0" data-composition-points="892,418;892,534;1200,534;1200,650" d="M 892 418 L 892 526 Q 892 534 900 534 L 1192 534 Q 1200 534 1200 542 L 1200 650" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="server" data-edge-to="runner" data-edge-label="代码提交 · 执行结果" data-edge-key="8" data-edge-id="server-runner" data-composition-points="892,418;892,534;1200,534;1200,650" d="M 892 418 L 892 526 Q 892 534 900 534 L 1192 534 Q 1200 534 1200 542 L 1200 650" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
         <g id="node-student" data-node-id="student" data-node-label="学生" tabindex="0" role="button" aria-label="聚焦学生，学习与互动, 架构组件" aria-pressed="false" data-node-kind="external" data-node-sublabel="学习与互动" data-node-context="架构组件">
@@ -553,15 +553,15 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="885" y="696" class="t-muted" font-size="9" text-anchor="middle">账号 · 会话 · 学习状态</text>
         </g>
 
-        <g id="node-judge0" data-node-id="judge0" data-node-label="Judge0" tabindex="0" role="button" aria-label="聚焦Judge0，代码执行 · 判题, Docker 部署" aria-pressed="false" data-node-kind="backend" data-node-sublabel="代码执行 · 判题" data-node-context="Docker 部署">
-          <title>Judge0 · 代码执行 · 判题 · Docker 部署</title>
+        <g id="node-runner" data-node-id="runner" data-node-label="go-judge" tabindex="0" role="button" aria-label="聚焦go-judge，多语言沙箱执行, Docker 部署" aria-pressed="false" data-node-kind="backend" data-node-sublabel="多语言沙箱执行" data-node-context="Docker 部署">
+          <title>go-judge · 多语言沙箱执行 · Docker 部署</title>
           <rect x="1110" y="650" width="180" height="64" rx="6" class="c-mask"/>
           <rect x="1110" y="650" width="180" height="64" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1116 656) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" x="1200" y="680" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Judge0</text>
-        <text x="1200" y="696" class="t-muted" font-size="9" text-anchor="middle">代码执行 · 判题</text>
+          <text data-node-label="" x="1200" y="680" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">go-judge</text>
+        <text x="1200" y="696" class="t-muted" font-size="9" text-anchor="middle">多语言沙箱执行</text>
         </g>
 
         <!-- Connection labels -->
@@ -594,7 +594,7 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="831" y="434" width="30" height="14" rx="3" class="c-mask"/>
           <text x="846" y="444" class="t-muted" font-size="8" text-anchor="middle">SQL</text>
         </g>
-        <g data-edge-from="server" data-edge-to="judge0" data-edge-label="代码提交 · 执行结果" data-edge-key="8" data-edge-id="server-judge0">
+        <g data-edge-from="server" data-edge-to="runner" data-edge-label="代码提交 · 执行结果" data-edge-key="8" data-edge-id="server-runner">
           <rect x="995.4" y="514" width="101.2" height="14" rx="3" class="c-mask"/>
           <text x="1046" y="524" class="t-muted" font-size="8" text-anchor="middle">代码提交 · 执行结果</text>
         </g>
