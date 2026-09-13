@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   ArrowDown, ArrowRight, BookOpen, Contrast, Code2, Compass,
   Menu, Moon, Sun, X,
 } from "lucide-react";
 import ClassroomScene from "./ClassroomScene";
+import { ActionLink } from "./components/ui/Action";
+import { FeatureCard } from "./components/ui/Card";
+import { Tabs } from "./components/ui/Tabs";
+import { ProductLink } from "./components/website/ProductLink";
+import { TeachingMedia } from "./components/website/TeachingMedia";
 import { OpeningScene, useScrollReveal, useScrollParallax } from "./WebsiteMotion";
-import { classroomImages, modalityImages, productUrl, stageImages } from "./website-content";
+import { classroomImages, modalityImages, stageImages } from "./website-content";
 
 const repository = "https://github.com/LanternCX/zhiya";
 type Theme = "auto" | "light" | "dark";
@@ -45,13 +50,6 @@ function initialTheme(): Theme {
     if (stored === "light" || stored === "dark") return stored;
   } catch { /* Keep automatic theme when storage is unavailable. */ }
   return "auto";
-}
-
-function ProductLink({ compact = false }: { compact?: boolean }) {
-  const className = compact ? "product-link compact" : "product-link";
-  return productUrl
-    ? <a className={className} href={productUrl}>进入知芽<ArrowRight aria-hidden="true" /></a>
-    : <button className={className} type="button" disabled>进入知芽<ArrowRight aria-hidden="true" /></button>;
 }
 
 function SproutMark() {
@@ -109,24 +107,6 @@ function SectionHeading({ id, title, children }: { id: string; title: string; ch
   return <div className="section-heading"><h2 id={id}>{title}</h2>{children && <p>{children}</p>}</div>;
 }
 
-function switchTab(event: KeyboardEvent<HTMLButtonElement>, index: number, count: number, select: (index: number) => void) {
-  const next = event.key === "ArrowRight" ? (index + 1) % count
-    : event.key === "ArrowLeft" ? (index + count - 1) % count
-    : event.key === "Home" ? 0 : event.key === "End" ? count - 1 : null;
-  if (next === null) return;
-  event.preventDefault();
-  select(next);
-  event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus();
-}
-
-function TeachingMedia({ image }: { image: { src: string; alt: string } }) {
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  return <figure className="teaching-media" aria-label={image.alt}>
-    {image.src && failedSrc !== image.src && <img src={image.src} alt={image.alt} width="1600" height="1000"
-      loading="lazy" onError={() => setFailedSrc(image.src)} />}
-  </figure>;
-}
-
 export default function App() {
   useScrollReveal();
   useScrollParallax();
@@ -167,7 +147,7 @@ export default function App() {
             <h1 id="hero-title">知芽</h1>
             <p className="hero-kicker">面向 K12 的<span>人工智能学习搭子</span></p>
             <p className="hero-copy">把抽象的知识，变成看得见的理解。</p>
-            <div className="hero-actions"><ProductLink /><a className="text-action" href="#experience">了解知芽<ArrowDown aria-hidden="true" /></a></div>
+            <div className="hero-actions"><ProductLink /><ActionLink variant="neutral" href="#experience">了解知芽<ArrowDown aria-hidden="true" /></ActionLink></div>
           </div>
         </section>
 
@@ -177,23 +157,19 @@ export default function App() {
           <section className="content-section" id="experience" aria-labelledby="experience-title">
             <SectionHeading id="experience-title" title="课程、探索与实验">一条知识路径，一个好问题，一次动手实践。</SectionHeading>
             <div className="feature-grid" id="learning">
-              {experiences.map(({ icon: Icon, title, copy, detail }) => <article className="feature-item" key={title}>
-                <Icon aria-hidden="true" /><h3>{title}</h3><p>{copy}</p><span className="feature-note">{detail}</span>
-              </article>)}
+              {experiences.map(({ icon: Icon, title, copy, detail }) => <FeatureCard key={title} title={title}
+                description={copy} icon={<Icon aria-hidden="true" />} note={detail} />)}
             </div>
             <div className="experiment-layout">
-              <div className="experiment-copy"><span className="section-index">TRY IT / 动手看一看</span><h3>一条直线，<br />怎么学会预测？</h3><p>从一组散点出发，观察数据、拟合直线，再试着预测一个新的数值。</p><a className="text-action" href="#lesson">走进知芽课堂<ArrowRight aria-hidden="true" /></a></div>
+              <div className="experiment-copy"><span className="section-index">TRY IT / 动手看一看</span><h3>一条直线，<br />怎么学会预测？</h3><p>从一组散点出发，观察数据、拟合直线，再试着预测一个新的数值。</p><ActionLink variant="neutral" href="#lesson">走进知芽课堂<ArrowRight aria-hidden="true" /></ActionLink></div>
               <div className="hero-visual"><div className="experiment-title"><span>线性回归 / LINEAR REGRESSION</span><span aria-hidden="true">↗</span></div><ClassroomScene /></div>
             </div>
           </section>
 
           <section className="content-section" id="lesson" aria-labelledby="lesson-title">
             <SectionHeading id="lesson-title" title="从一个问题，到真正理解">提问、讲解、实践与反馈，让每一步学习都有回应。</SectionHeading>
-            <div className="text-tabs" role="tablist" aria-label="课堂步骤">
-              {lessonSteps.map(([label], index) => <button key={label} id={`lesson-tab-${index}`} type="button" role="tab"
-                aria-selected={lessonStep === index} aria-controls="lesson-panel" tabIndex={lessonStep === index ? 0 : -1}
-                onKeyDown={event => switchTab(event, index, lessonSteps.length, setLessonStep)} onClick={() => setLessonStep(index)}>{label}</button>)}
-            </div>
+            <Tabs ariaLabel="课堂步骤" idPrefix="lesson-tab" items={lessonSteps.map(([label]) => label)}
+              onSelect={setLessonStep} panelId="lesson-panel" selectedIndex={lessonStep} />
             <div className="lesson-layout" role="tabpanel" id="lesson-panel" aria-labelledby={`lesson-tab-${lessonStep}`}>
               <TeachingMedia key={lessonStep} image={classroomImages[lessonStep]} />
               <div className="lesson-copy" key={`copy-${lessonStep}`}><h3>{lessonSteps[lessonStep][1]}</h3><p>{lessonSteps[lessonStep][2]}</p><ProductLink /></div>
@@ -202,11 +178,8 @@ export default function App() {
 
           <section className="content-section" id="stages" aria-labelledby="stages-title">
             <SectionHeading id="stages-title" title="每个阶段，都有合适的起点">从具体观察到模型实践，知识深度与学习方式一起成长。</SectionHeading>
-            <div className="text-tabs grade-tabs" role="tablist" aria-label="学段选择">
-              {stages.map(({ name }, index) => <button type="button" role="tab" key={name} id={`grade-tab-${index}`}
-                aria-selected={selectedStage === index} aria-controls="grade-panel" tabIndex={selectedStage === index ? 0 : -1}
-                onKeyDown={event => switchTab(event, index, stages.length, setSelectedStage)} onClick={() => setSelectedStage(index)}>{name}</button>)}
-            </div>
+            <Tabs ariaLabel="学段选择" className="grade-tabs" idPrefix="grade-tab" items={stages.map(({ name }) => name)}
+              onSelect={setSelectedStage} panelId="grade-panel" selectedIndex={selectedStage} />
             <div className="stage-detail" role="tabpanel" id="grade-panel" aria-labelledby={`grade-tab-${selectedStage}`}>
               <TeachingMedia key={selectedStage} image={stageImages[selectedStage]} />
               <div className="stage-copy" key={`copy-${selectedStage}`}>
@@ -219,9 +192,8 @@ export default function App() {
           <section className="content-section" id="multimodal" aria-labelledby="multimodal-title">
             <SectionHeading id="multimodal-title" title="让每一种知识，都有合适的讲法。">听、看、动手尝试，用适合自己的方式认识人工智能。</SectionHeading>
             <div className="feature-grid modality-grid">
-              {modalities.map(({ title, copy }, index) => <article className="feature-item" key={title}>
-                <TeachingMedia image={modalityImages[index]} /><h3>{title}</h3><p>{copy}</p>
-              </article>)}
+              {modalities.map(({ title, copy }, index) => <FeatureCard key={title} title={title} description={copy}
+                media={<TeachingMedia image={modalityImages[index]} />} />)}
             </div>
           </section>
 
