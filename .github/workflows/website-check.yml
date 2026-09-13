@@ -7,7 +7,6 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/website-check.yml"
-      - ".github/workflows/deploy-website.yml"
 
 permissions:
   contents: read
