@@ -1,0 +1,33 @@
+name: Website check
+
+on:
+  pull_request:
+    paths:
+      - "apps/website/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/website-check.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check:website
+      - run: npm run test:website
+      - run: npm run build:website
+      - run: npm run test:website:pages
