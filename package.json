@@ -1,7 +1,7 @@
 {
   "name": "zhiya",
   "private": true,
-  "workspaces": ["apps/client"],
+  "workspaces": ["apps/client", "apps/website"],
   "engines": { "node": ">=22.19.0" },
   "scripts": {
     "dev": "node scripts/run.mjs client-dev",
@@ -18,6 +18,11 @@
     "test:desktop": "node scripts/run.mjs desktop-test",
     "test:e2e": "node scripts/run.mjs test-e2e",
     "check:server-config": "node scripts/run.mjs check-server-config",
-    "check:client-config": "node scripts/run.mjs check-client-config"
+    "check:client-config": "node scripts/run.mjs check-client-config",
+    "dev:website": "npm run dev --workspace @zhiya/website",
+    "build:website": "npm run build --workspace @zhiya/website",
+    "check:website": "npm run check --workspace @zhiya/website",
+    "test:website": "npm run test:e2e --workspace @zhiya/website",
+    "test:website:pages": "npm run test:pages --workspace @zhiya/website"
   }
 }
