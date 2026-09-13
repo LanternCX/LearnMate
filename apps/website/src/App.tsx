@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import {
   ArrowDown, ArrowRight, BookOpen, Contrast, Code2, Compass,
-  Github, Menu, Moon, Sun, X,
+  Menu, Moon, Sun, X,
 } from "lucide-react";
 import ClassroomScene from "./ClassroomScene";
 import { OpeningScene, useScrollReveal, useScrollParallax } from "./WebsiteMotion";
@@ -244,7 +244,7 @@ export default function App() {
           <nav aria-label="页尾导航"><a href="#experience">产品介绍</a><a href="#about">关于知芽</a></nav>
         </div>
         <div className="footer-bottom"><span>让每一次好奇，都有继续探索的可能。</span><div className="footer-links">
-          <a href={repository} target="_blank" rel="noreferrer" aria-label="GitHub 仓库"><Github aria-hidden="true" />GitHub</a>
+          <a href={repository} target="_blank" rel="noreferrer" aria-label="GitHub 仓库">GitHub</a>
           <a href={`${repository}/blob/main/LICENSE`} target="_blank" rel="noreferrer">AGPL-3.0</a>
         </div></div>
       </footer>
