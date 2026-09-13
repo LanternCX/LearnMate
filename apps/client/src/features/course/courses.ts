@@ -7,9 +7,9 @@ import type {
 
 export const emptyCourseState = (): CourseConversationState => ({
   messages: [],
-  slides: [],
-  presentedSlideIds: [],
-  currentSlideId: "",
+  pages: [],
+  presentedPageIds: [],
+  currentPageId: "",
 });
 
 export async function listCourses() {

@@ -21,6 +21,7 @@ type application struct {
 	send        func(to, purpose, code string) error
 	config      config.Config
 	learningHub *learningHub
+	runner      codeRunner
 }
 
 func main() {
@@ -54,7 +55,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := &application{models: data.NewModels(db, cfg.Account), send: send, config: cfg, learningHub: newLearningHub()}
+	app := &application{models: data.NewModels(db, cfg.Account), send: send, config: cfg, learningHub: newLearningHub(), runner: newCodeRunnerClient(cfg.Runner, http.DefaultClient)}
 	err = app.models.Initialize(startup)
 	if err == nil {
 		err = app.startLearningEvents(ctx)

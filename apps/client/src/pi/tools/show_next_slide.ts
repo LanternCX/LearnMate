@@ -13,15 +13,15 @@ export function showNextSlideTool(next: SlideTools["next"]): AgentTool {
     parameters: Type.Object({}),
     executionMode: "sequential",
     execute: async () => {
-      const slide = await next();
+      const page = await next();
       return {
         content: [
           {
             type: "text",
-            text: `The next page is now visible: ${JSON.stringify(slide)}. Explain only this page before advancing again.`,
+            text: `The next page is now visible: ${JSON.stringify(page)}. Explain only this page before advancing again.`,
           },
         ],
-        details: { slide },
+        details: { page },
       };
     },
   };

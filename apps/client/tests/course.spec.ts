@@ -65,6 +65,164 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+test("a student runs a model-created coding page and receives a review only when ending it", async ({
+  page,
+}) => {
+  await mockCompletedWorkspace(page);
+  await page.route("**/api/code/languages", (route) =>
+    route.fulfill({
+      json: { languages: [{ id: 71, name: "Python (3.8.1)" }] },
+    }),
+  );
+  let submittedCode = "";
+  let runRequests = 0;
+  let releaseFirstRun = () => {};
+  const firstRunPending = new Promise<void>((resolve) => {
+    releaseFirstRun = resolve;
+  });
+  await page.route("**/api/code/runs", async (route) => {
+    submittedCode = route.request().postDataJSON().sourceCode;
+    runRequests++;
+    if (runRequests === 1) await firstRunPending;
+    await route.fulfill({
+      json: {
+        stdout: "你好，知芽！\n",
+        stderr: "",
+        compileOutput: "",
+        message: "",
+        status: { description: "Completed" },
+        time: "0.01",
+        memory: 3200,
+      },
+    });
+  });
+  let teacherCalls = 0;
+  await page.route("**/api/learning/course/model", async (route: Route) => {
+    const request = route.request().postDataJSON() as {
+      agent: "teacher" | "slides";
+      payload: { messages: Array<{ role: string; content: unknown }> };
+    };
+    if (request.agent === "slides") {
+      await route.fulfill(textResponse(""));
+      return;
+    }
+    teacherCalls++;
+    const transcript = JSON.stringify(request.payload.messages);
+    if (transcript.includes("结束这次编程练习")) {
+      if (!transcript.includes('"name":"end_coding_exercise"')) {
+        await route.fulfill(
+          toolResponse("finish-code", "end_coding_exercise", {}),
+        );
+      } else {
+        await route.fulfill(
+          textResponse("代码能够清楚地完成任务，还可以把问候语提取成变量。"),
+        );
+      }
+      return;
+    }
+    if (!transcript.includes('"name":"show_coding_exercise"')) {
+      await route.fulfill(
+        toolResponse("coding-page", "show_coding_exercise", {
+          title: "打印一声问候",
+          instructions:
+            "**修改程序**，完成下面的任务：\n\n- 使用 `print` 输出：你好，知芽！",
+          languageId: 71,
+          languageName: "Python (3.8.1)",
+          starterCode: "print('你好')",
+        }),
+      );
+    } else {
+      await route.fulfill(textResponse("你可以自己修改并运行这段代码。"));
+    }
+  });
+
+  await page.goto("/");
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("教我输出文字");
+  await page.getByRole("button", { name: "发送" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "打印一声问候" }),
+  ).toBeVisible();
+  await expect(page.getByText("main.py", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Python (3.8.1)", { exact: true }),
+  ).toBeVisible();
+  const instructions = page.getByRole("region", { name: "题目说明" });
+  const emphasisWeight = await instructions
+    .getByText("修改程序", { exact: true })
+    .evaluate((element) => Number(getComputedStyle(element).fontWeight));
+  expect(emphasisWeight).toBeGreaterThan(400);
+  await expect(
+    instructions.getByRole("listitem").getByText(/使用/),
+  ).toBeVisible();
+  await expect(instructions.locator("code")).toHaveText("print");
+  const editor = page.getByRole("textbox", { name: "代码" });
+  await editor.fill("if True:\n");
+  await editor.press("Tab");
+  await editor.type("pass");
+  expect(
+    await editor.evaluate((element) => document.activeElement === element),
+  ).toBe(true);
+  await page.getByRole("button", { name: "运行代码" }).click();
+  const runningButton = page.getByRole("button", { name: "代码正在运行" });
+  await expect(runningButton).toBeVisible();
+  await expect(runningButton).toBeDisabled();
+  await expect(runningButton).toHaveAttribute("aria-busy", "true");
+  const runSpinner = runningButton.locator("svg");
+  await expect(runSpinner).toBeVisible();
+  await expect(runSpinner).not.toHaveCSS("animation-name", "none");
+  await expect(page.getByText("运行中…", { exact: true })).toHaveCount(0);
+  releaseFirstRun();
+  await expect(
+    page.getByRole("button", { name: "运行代码" }),
+  ).toBeEnabled();
+  await expect.poll(() => submittedCode).toBe("if True:\n    pass");
+  await editor.press("Shift+Tab");
+  await page.getByRole("button", { name: "运行代码" }).click();
+  await expect.poll(() => submittedCode).toBe("if True:\npass");
+  await editor.fill("if True:");
+  await editor.press("Enter");
+  await editor.type("pass");
+  await page.getByRole("button", { name: "运行代码" }).click();
+  await expect.poll(() => submittedCode).toBe("if True:\n    pass");
+  await editor.fill("wh");
+  await editor.press("Control+Space");
+  const completion = page.getByRole("option", { name: "while" });
+  await expect(completion).toBeVisible();
+  await expect(completion).toHaveAttribute("aria-selected", "true");
+  // CodeMirror intentionally delays accepting a newly opened completion so a
+  // fast Enter keypress cannot select an option before the user sees it.
+  await page.waitForTimeout(100);
+  await editor.press("Enter");
+  await expect(
+    editor.locator(".tok-keyword", { hasText: "while" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "运行代码" }).click();
+  await expect.poll(() => submittedCode).toBe("while :\n    ");
+  await editor.fill("print('你好，知芽！')");
+  await expect(editor.locator(".cm-matchingBracket")).toHaveCount(2);
+  await page.getByRole("button", { name: "运行代码" }).click();
+  await expect(page.getByText("你好，知芽！", { exact: true })).toBeVisible();
+  const outputBox = await page
+    .getByRole("region", { name: "运行结果" })
+    .boundingBox();
+  const runButtonBox = await page
+    .getByRole("button", { name: "运行代码" })
+    .boundingBox();
+  expect((outputBox?.y ?? 0) + (outputBox?.height ?? 0)).toBeLessThan(
+    runButtonBox?.y ?? 0,
+  );
+  expect(submittedCode).toBe("print('你好，知芽！')");
+  expect(teacherCalls).toBe(2);
+
+  await page.getByRole("button", { name: "结束练习" }).click();
+  await expect(page.getByText(/还可以把问候语提取成变量/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "练习已结束" })).toBeDisabled();
+  await expect(editor).toHaveAttribute("contenteditable", "false");
+});
+
 async function mockCompletedWorkspace(page: Page) {
   await page.route("**/api/me", (route) =>
     route.fulfill({
@@ -137,7 +295,9 @@ test("teacher follows the student's requested slide pace while keeping narration
   );
 });
 
-test("a student sees when the model connection is retrying", async ({ page }) => {
+test("a student sees when the model connection is retrying", async ({
+  page,
+}) => {
   await mockCompletedWorkspace(page);
   await page.goto("/");
   await page.evaluate(() => {
@@ -148,9 +308,7 @@ test("a student sees when the model connection is retrying", async ({ page }) =>
         const body = new ReadableStream<Uint8Array>({
           start(controller) {
             controller.enqueue(
-              encoder.encode(
-                ': zhiya-retry {"attempt":1,"maxRetries":5}\n\n',
-              ),
+              encoder.encode(': zhiya-retry {"attempt":1,"maxRetries":5}\n\n'),
             );
             window.setTimeout(() => {
               const response =
@@ -162,7 +320,10 @@ test("a student sees when the model connection is retrying", async ({ page }) =>
                   choices: [
                     {
                       index: 0,
-                      delta: { role: "assistant", content: "连接恢复了，我们继续。" },
+                      delta: {
+                        role: "assistant",
+                        content: "连接恢复了，我们继续。",
+                      },
                       finish_reason: null,
                     },
                   ],
@@ -273,7 +434,9 @@ test("a student keeps talking while slides arrive and replaces unfinished pages"
         );
       } else {
         await route.fulfill(
-          textResponse(simpler ? "好，我们换成更直观的例子。" : "我们边看课件边聊。"),
+          textResponse(
+            simpler ? "好，我们换成更直观的例子。" : "我们边看课件边聊。",
+          ),
         );
       }
       return;
@@ -328,26 +491,42 @@ test("a student keeps talking while slides arrive and replaces unfinished pages"
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
-  await expect(page.getByText("初次交流已完成", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "今天想学什么？" }),
+  ).toBeVisible();
+  await expect(page.getByText("初次交流已完成", { exact: true })).toHaveCount(
+    0,
+  );
   await expect(page.getByRole("region", { name: "课程记录" })).toHaveCount(0);
   await expect(page.locator(".course-conversation > header")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "分页课件" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "课堂页面" })).toHaveCount(0);
   await expect(page.locator(".workspace-sidebar")).toHaveCSS(
     "border-right-width",
     "1px",
   );
-  await page.getByRole("textbox", { name: "告诉知芽你想学什么" }).fill("我想学习人工智能");
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("我想学习人工智能");
   await page.getByRole("button", { name: "发送" }).click();
 
-  const slides = page.getByRole("region", { name: "分页课件" });
-  await expect(slides.getByRole("img", { name: "课件页面：人工智能是什么？" })).toBeVisible();
-  await expect(page.getByText("我们边看课件边聊。", { exact: true })).toBeVisible();
+  const slides = page.getByRole("region", { name: "课堂页面" });
+  await expect(
+    slides.getByRole("img", { name: "课件页面：人工智能是什么？" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("我们边看课件边聊。", { exact: true }),
+  ).toBeVisible();
 
-  await page.getByRole("textbox", { name: "告诉知芽你想学什么" }).fill("换成简单一点的例子");
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("换成简单一点的例子");
   await page.getByRole("button", { name: "发送" }).click();
-  await expect(slides.getByRole("img", { name: "课件页面：机器也会认猫吗？" })).toBeVisible();
-  await expect(page.getByText("好，我们换成更直观的例子。", { exact: true })).toBeVisible();
+  await expect(
+    slides.getByRole("img", { name: "课件页面：机器也会认猫吗？" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("好，我们换成更直观的例子。", { exact: true }),
+  ).toBeVisible();
 
   releaseNew();
   releaseOld();
@@ -358,7 +537,9 @@ test("a student keeps talking while slides arrive and replaces unfinished pages"
   await expect(slides.getByRole("button", { name: "下一页" })).toBeVisible();
 });
 
-test("a failed slide task is reported and a later request can retry", async ({ page }) => {
+test("a failed slide task is reported and a later request can retry", async ({
+  page,
+}) => {
   await page.route("**/api/me", (route) =>
     route.fulfill({
       json: {
@@ -397,7 +578,9 @@ test("a failed slide task is reported and a later request can retry", async ({ p
       (message) => message.role === "tool",
     ).length;
     if (request.agent === "teacher") {
-      const retrying = JSON.stringify(request.payload.messages).includes("请重试课件");
+      const retrying = JSON.stringify(request.payload.messages).includes(
+        "请重试课件",
+      );
       if ((!retrying && toolResults === 0) || (retrying && toolResults < 2)) {
         await route.fulfill(
           toolResponse(`slides-${crypto.randomUUID()}`, "create_slides", {
@@ -414,7 +597,10 @@ test("a failed slide task is reported and a later request can retry", async ({ p
 
     slideAttempts++;
     if (slideAttempts === 1) {
-      await route.fulfill({ status: 502, json: { error: "模型服务暂时不可用" } });
+      await route.fulfill({
+        status: 502,
+        json: { error: "模型服务暂时不可用" },
+      });
       return;
     }
     await route.fulfill(
@@ -432,19 +618,23 @@ test("a failed slide task is reported and a later request can retry", async ({ p
   await prompt.fill("给我讲机器学习");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(page.getByRole("alert")).toContainText("模型服务暂时不可用");
-  await expect(page.getByRole("button", { name: "打断", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "打断", exact: true }),
+  ).toHaveCount(0);
 
   await prompt.fill("请重试课件");
   await page.getByRole("button", { name: "发送" }).click();
   await expect(
-    page.getByRole("region", { name: "分页课件" }).getByRole("img", {
+    page.getByRole("region", { name: "课堂页面" }).getByRole("img", {
       name: "课件页面：机器怎样从例子中学习？",
     }),
   ).toBeVisible();
   await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
-test("teacher markdown renders before the model stream finishes", async ({ page }) => {
+test("teacher markdown renders before the model stream finishes", async ({
+  page,
+}) => {
   await page.route("**/api/me", (route) =>
     route.fulfill({
       json: {
@@ -502,9 +692,7 @@ test("teacher markdown renders before the model stream finishes", async ({ page 
           start(controller) {
             controller.enqueue(
               encoder.encode(
-                event(
-                  "# 流式标题\n\n第一段\n\n```js\nconst answer = 42;\n```",
-                ),
+                event("# 流式标题\n\n第一段\n\n```js\nconst answer = 42;\n```"),
               ),
             );
             window.addEventListener(
@@ -524,11 +712,15 @@ test("teacher markdown renders before the model stream finishes", async ({ page 
   });
 
   await page.goto("/");
-  await expect(page.getByRole("region", { name: "分页课件" })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "告诉知芽你想学什么" }).fill("开始讲解");
+  await expect(page.getByRole("region", { name: "课堂页面" })).toHaveCount(0);
+  await page
+    .getByRole("textbox", { name: "告诉知芽你想学什么" })
+    .fill("开始讲解");
   await page.getByRole("button", { name: "发送" }).click();
 
-  await expect(page.getByText("正在思考教学节奏…", { exact: true })).toBeVisible({
+  await expect(
+    page.getByText("正在思考教学节奏…", { exact: true }),
+  ).toBeVisible({
     timeout: 500,
   });
   await page.evaluate(() =>
@@ -546,16 +738,22 @@ test("teacher markdown renders before the model stream finishes", async ({ page 
   await expect(codeActions.getByRole("button")).toHaveCount(1);
   await expect(page.getByText("第二段", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "发送" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打断", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "打断", exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "打断", exact: true }).click();
   await page.waitForTimeout(500);
   await expect(page.getByText("第二段", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打断", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "打断", exact: true }),
+  ).toHaveCount(0);
   await expect(page.getByRole("button", { name: "发送" })).toBeVisible();
 });
 
-test("the next slide follows its explanation and keeps the conversation anchor", async ({ page }) => {
+test("the next slide follows its explanation and keeps the conversation anchor", async ({
+  page,
+}) => {
   await page.route("**/api/me", (route) =>
     route.fulfill({
       json: {
@@ -652,11 +850,13 @@ test("the next slide follows its explanation and keeps the conversation anchor",
   await expect(page.getByText("正在准备课件", { exact: true })).toBeVisible();
   finishPreparingFirstSlide();
 
-  const slides = page.getByRole("region", { name: "分页课件" });
-  await expect(slides.getByRole("img", { name: "课件页面：第一页" })).toBeVisible();
+  const slides = page.getByRole("region", { name: "课堂页面" });
   await expect(
-    page.getByText("第一页讲解开始。", { exact: true }),
-  ).toBeVisible({ timeout: 500 });
+    slides.getByRole("img", { name: "课件页面：第一页" }),
+  ).toBeVisible();
+  await expect(page.getByText("第一页讲解开始。", { exact: true })).toBeVisible(
+    { timeout: 500 },
+  );
   const layout = await page.locator(".course-room").evaluate((room) => {
     const thread = room.querySelector<HTMLElement>(".course-thread");
     return {
@@ -668,16 +868,24 @@ test("the next slide follows its explanation and keeps the conversation anchor",
   });
   expect(layout.bottom).toBeLessThanOrEqual(layout.viewport);
   expect(layout.threadScrollHeight).toBeGreaterThan(layout.threadClientHeight);
-  await expect(page.getByText("需要慢慢读完第二行。", { exact: true })).toBeVisible();
-  await expect(slides.getByRole("img", { name: "课件页面：第二页" })).toBeVisible();
-  await expect(page.getByText("现在讲解第二页。", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("需要慢慢读完第二行。", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    slides.getByRole("img", { name: "课件页面：第二页" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("现在讲解第二页。", { exact: true }),
+  ).toBeVisible();
 
   const thread = page.locator(".course-thread");
   await thread.evaluate((element) => element.scrollTo({ top: 0 }));
   await slides.getByRole("button", { name: "上一页" }).click();
-  await expect(slides.getByRole("img", { name: "课件页面：第一页" })).toBeVisible();
+  await expect(
+    slides.getByRole("img", { name: "课件页面：第一页" }),
+  ).toBeVisible();
   const firstPageAnchor = page.locator(
-    '.course-message[data-slide-id="synchronized-page-1"]',
+    '.course-message[data-page-id="synchronized-page-1"]',
   );
   await expect(firstPageAnchor).toBeVisible();
   await expect(firstPageAnchor).toHaveAttribute("aria-current", "step");
@@ -719,11 +927,12 @@ test("a saved course restores its conversation and supports rename and delete", 
           id: 2,
           role: "assistant" as const,
           text: "这是已保存的讲解。",
-          slideId: "solar-slide",
+          pageId: "solar-slide",
         },
       ],
-      slides: [
+      pages: [
         {
+          kind: "slide" as const,
           id: "solar-slide",
           title: "太阳系",
           kicker: "我们的宇宙邻居",
@@ -732,8 +941,8 @@ test("a saved course restores its conversation and supports rename and delete", 
           layout: "explain" as const,
         },
       ],
-      presentedSlideIds: ["solar-slide"],
-      currentSlideId: "solar-slide",
+      presentedPageIds: ["solar-slide"],
+      currentPageId: "solar-slide",
     },
     createdAt: "2026-09-10T08:00:00Z",
     updatedAt: "2026-09-10T08:00:00Z",
@@ -764,13 +973,19 @@ test("a saved course restores its conversation and supports rename and delete", 
   });
 
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
-  await expect(page.getByText("这是已保存的讲解。", { exact: true })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "分页课件" })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "今天想学什么？" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("这是已保存的讲解。", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "课堂页面" })).toHaveCount(0);
   await expect(
     page.getByRole("img", { name: "课程封面：认识太阳系" }),
   ).toBeVisible();
-  const subjectArtBox = await page.locator(".course-start .subject-art").boundingBox();
+  const subjectArtBox = await page
+    .locator(".course-start .subject-art")
+    .boundingBox();
   const headingBox = await page
     .getByRole("heading", { name: "今天想学什么？" })
     .boundingBox();
@@ -788,7 +1003,9 @@ test("a saved course restores its conversation and supports rename and delete", 
   const composerBox = await page
     .getByRole("textbox", { name: "告诉知芽你想学什么" })
     .boundingBox();
-  expect(Math.abs((cardBox?.width ?? 0) - (cardBox?.height ?? 0))).toBeLessThan(2);
+  expect(Math.abs((cardBox?.width ?? 0) - (cardBox?.height ?? 0))).toBeLessThan(
+    2,
+  );
   expect((cardBox?.y ?? 0) + (cardBox?.height ?? 0)).toBeLessThan(
     composerBox?.y ?? 0,
   );
@@ -801,7 +1018,9 @@ test("a saved course restores its conversation and supports rename and delete", 
     "none",
   );
   await page.getByRole("button", { name: "打开课程：认识太阳系" }).click();
-  await expect(page.getByText("这是已保存的讲解。", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("这是已保存的讲解。", { exact: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("img", { name: "课件页面：太阳系" }),
   ).toBeVisible();
@@ -830,7 +1049,9 @@ test("a saved course restores its conversation and supports rename and delete", 
   await expect(
     page.getByRole("button", { name: "打开课程：太阳系入门" }),
   ).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "今天想学什么？" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "今天想学什么？" }),
+  ).toBeVisible();
 });
 
 test("the teacher agent creates and persists a course from the first request", async ({
@@ -850,15 +1071,16 @@ test("the teacher agent creates and persists a course from the first request", a
     },
     state: {
       messages: [],
-      slides: [],
-      presentedSlideIds: [],
-      currentSlideId: "",
+      pages: [],
+      presentedPageIds: [],
+      currentPageId: "",
     },
     createdAt: "2026-09-10T08:00:00Z",
     updatedAt: "2026-09-10T08:00:00Z",
   };
   let creation: { title: string; topic: string } | null = null;
-  let persisted: { state?: { messages?: Array<{ text: string }> } } | null = null;
+  let persisted: { state?: { messages?: Array<{ text: string }> } } | null =
+    null;
   await page.route("**/api/courses", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ json: { courses: [] } });
@@ -867,10 +1089,13 @@ test("the teacher agent creates and persists a course from the first request", a
     creation = route.request().postDataJSON() as typeof creation;
     await route.fulfill({ status: 201, json: { course: created } });
   });
-  await page.route("**/api/courses/course-agent/conversation", async (route) => {
-    persisted = route.request().postDataJSON() as typeof persisted;
-    await route.fulfill({ json: { ok: true } });
-  });
+  await page.route(
+    "**/api/courses/course-agent/conversation",
+    async (route) => {
+      persisted = route.request().postDataJSON() as typeof persisted;
+      await route.fulfill({ json: { ok: true } });
+    },
+  );
   await page.route("**/api/learning/course/model", async (route: Route) => {
     const request = route.request().postDataJSON() as {
       agent: "teacher" | "slides";

@@ -28,7 +28,7 @@ type CourseCover struct {
 
 type CourseModel struct{ db database }
 
-var emptyCourseState = json.RawMessage(`{"messages":[],"slides":[],"presentedSlideIds":[],"currentSlideId":""}`)
+var emptyCourseState = json.RawMessage(`{"messages":[],"pages":[],"presentedPageIds":[],"currentPageId":""}`)
 
 func scanCourse(row pgx.Row) (Course, error) {
 	var course Course
