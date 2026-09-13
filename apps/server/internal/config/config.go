@@ -20,11 +20,15 @@ import (
 
 type Config struct {
 	Model       Model    `yaml:"model"`
+	Runner      Runner   `yaml:"runner"`
 	Development bool     `yaml:"development"`
 	Server      Server   `yaml:"http"`
 	Database    Database `yaml:"database"`
 	SMTP        SMTP     `yaml:"smtp"`
 	Account     Account  `yaml:"account"`
+}
+type Runner struct {
+	Endpoint string `yaml:"endpoint"`
 }
 type Model struct {
 	Endpoint string `yaml:"endpoint"`
@@ -201,6 +205,10 @@ func (c Config) Validate() error {
 		if c.Model.ID == "" {
 			return fmt.Errorf("model.id is required when model.endpoint is configured")
 		}
+	}
+	runner, err := url.Parse(c.Runner.Endpoint)
+	if err != nil || runner.Host == "" || runner.User != nil || runner.RawQuery != "" || runner.Fragment != "" || (runner.Scheme != "http" && runner.Scheme != "https") {
+		return fmt.Errorf("runner.endpoint must be an HTTP(S) URL")
 	}
 	// All numeric settings are positive and bounded to avoid duration/size overflow.
 	if err := positive(reflect.ValueOf(c), ""); err != nil {

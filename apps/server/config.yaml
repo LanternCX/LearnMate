@@ -9,6 +9,10 @@ model:
   id: ""
   api_key: ""
 
+# The code runner is only reached by the Go server. Development binds it to loopback.
+runner:
+  endpoint: "http://127.0.0.1:2358"
+
 http:
   listen: "127.0.0.1:8080"
   origin: "http://127.0.0.1:1420"
