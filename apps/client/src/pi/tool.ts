@@ -1,4 +1,11 @@
-import type { CourseCover, StoredCourse, Slide } from "../domain/learning";
+import type {
+  CodeLanguage,
+  CodingExercise,
+  CourseCover,
+  StoredCourse,
+  Slide,
+  LessonPage,
+} from "../domain/learning";
 import type { SlideRequest } from "./tools/create_slides";
 
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -41,10 +48,23 @@ export type SlideTools = {
   start: (request: SlideRequest) => Promise<Slide>;
   cancel: () => void;
   read: () => { pages: Slide[]; generating: boolean };
-  next: () => Promise<Slide>;
+  next: () => Promise<LessonPage>;
 };
 
 export type TeachingToolContext = {
   course: { id: string; title: string; topic: string };
   management: CourseManagement;
+};
+
+export type CodingTools = {
+  languages: () => Promise<CodeLanguage[]>;
+  show: (
+    id: string,
+    exercise: Pick<
+      CodingExercise,
+      "title" | "instructions" | "languageId" | "languageName" | "starterCode"
+    >,
+  ) => CodingExercise;
+  read: () => CodingExercise;
+  end: () => CodingExercise;
 };

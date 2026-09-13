@@ -15,7 +15,7 @@ export function createSlidesAgent(options: {
   model: ModelInfo;
   gateway: ModelGateway;
   memory: string;
-  publish: (id: string, page: Omit<Slide, "id">) => number;
+  publish: (id: string, page: Omit<Slide, "id" | "kind">) => number;
   onRetry: ModelRetryListener;
 }) {
   return createAgent({

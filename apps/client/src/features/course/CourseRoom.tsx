@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import "./course.css";
 import type { CourseSession } from "../../pi";
 import { createCourseSession } from "./runtime";
 import type {
   CourseActivity,
   CourseMessage,
-  Slide,
+  LessonPage,
   ModelInfo,
   ModelRetryStatus,
   CourseConversationState,
@@ -21,6 +21,7 @@ import { Shimmer } from "../../components/ai-elements/shimmer";
 import { PromptInputSubmit } from "../../components/ai-elements/prompt-input";
 import { Spinner } from "../../components/ui/spinner";
 import SlideCanvas from "./SlideCanvas";
+import { listCodeLanguages, runCode } from "./code";
 import CourseLibrary from "./CourseLibrary";
 import Icon from "../../components/Icon";
 import ConnectionRetry from "../../components/ConnectionRetry";
@@ -32,6 +33,8 @@ import {
 } from "./courses";
 
 type RenderedCourseMessage = CourseMessage;
+
+const CodingPage = lazy(() => import("./CodingPage"));
 
 const conversationControls = {
   code: { copy: true, download: false },
@@ -65,9 +68,7 @@ function Activity({ activity }: { activity: CourseActivity | null }) {
             )
           }
         />
-        {activity.text && (
-          <ReasoningContent>{activity.text}</ReasoningContent>
-        )}
+        {activity.text && <ReasoningContent>{activity.text}</ReasoningContent>}
       </Reasoning>
     );
   return (
@@ -119,7 +120,7 @@ export default function CourseRoom({
   onCourseUpdated: (course: StoredCourse) => void;
 }) {
   const [messages, setMessages] = useState<RenderedCourseMessage[]>([]);
-  const [slides, setSlides] = useState<Slide[]>([]);
+  const [pages, setPages] = useState<LessonPage[]>([]);
   const [presented, setPresented] = useState<Set<string>>(() => new Set());
   const [page, setPage] = useState(0);
   const [text, setText] = useState("");
@@ -161,10 +162,10 @@ export default function CourseRoom({
     sessionCourse.current = activeCourse;
     setCourse(activeCourse);
     setMessages(initial.messages);
-    setSlides(initial.slides);
-    setPresented(new Set(initial.presentedSlideIds));
-    const initialPage = initial.slides.findIndex(
-      (slide) => slide.id === initial.currentSlideId,
+    setPages(initial.pages);
+    setPresented(new Set(initial.presentedPageIds));
+    const initialPage = initial.pages.findIndex(
+      (page) => page.id === initial.currentPageId,
     );
     setPage(Math.max(0, initialPage));
     setBusy(false);
@@ -179,18 +180,11 @@ export default function CourseRoom({
           if (!replaceLast) return [...all, message];
           return [...all.slice(0, -1), message];
         }),
-      (next) => {
-        setSlides((existing) => {
-          const added = next.filter(
-            (slide) => !existing.some((item) => item.id === slide.id),
-          );
-          return [...existing, ...added];
-        });
-      },
-      (slideId) => {
-        setPresented((existing) => new Set(existing).add(slideId));
-        setSlides((existing) => {
-          const index = existing.findIndex((slide) => slide.id === slideId);
+      (next) => setPages(next),
+      (pageId) => {
+        setPresented((existing) => new Set(existing).add(pageId));
+        setPages((existing) => {
+          const index = existing.findIndex((page) => page.id === pageId);
           if (index >= 0) setPage(index);
           return existing;
         });
@@ -209,8 +203,7 @@ export default function CourseRoom({
           return created;
         },
         rename: async (title, topic) => {
-          if (!sessionCourse.current)
-            throw new Error("课程尚未建立");
+          if (!sessionCourse.current) throw new Error("课程尚未建立");
           const updated = await updateCourse(sessionCourse.current.id, {
             title,
             ...(topic ? { topic } : {}),
@@ -222,6 +215,7 @@ export default function CourseRoom({
           return next;
         },
       },
+      listCodeLanguages,
     );
     session.current = current;
     return () => {
@@ -234,9 +228,9 @@ export default function CourseRoom({
     if (!course) return;
     const state = {
       messages,
-      slides,
-      presentedSlideIds: [...presented],
-      currentSlideId: slides[page]?.id ?? "",
+      pages,
+      presentedPageIds: [...presented],
+      currentPageId: pages[page]?.id ?? "",
     };
     const updated = { ...course, state };
     sessionCourse.current = updated;
@@ -247,7 +241,7 @@ export default function CourseRoom({
       void flushCourseSave();
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [course?.id, course?.conversationId, messages, slides, presented, page]);
+  }, [course?.id, course?.conversationId, messages, pages, presented, page]);
 
   useEffect(
     () => () => {
@@ -302,14 +296,15 @@ export default function CourseRoom({
     setBusy(false);
   };
   const running = busy;
-  const current = slides[Math.min(page, Math.max(0, slides.length - 1))];
+  const current = pages[Math.min(page, Math.max(0, pages.length - 1))];
 
   useEffect(() => {
     const container = thread.current;
     if (!container || !current) return;
     const frame = window.requestAnimationFrame(() => {
-      const anchor = [...container.querySelectorAll<HTMLElement>(".course-message")]
-        .find((message) => message.dataset.slideId === current.id);
+      const anchor = [
+        ...container.querySelectorAll<HTMLElement>(".course-message"),
+      ].find((message) => message.dataset.pageId === current.id);
       if (!anchor) return;
       const top =
         container.scrollTop +
@@ -328,13 +323,11 @@ export default function CourseRoom({
   const previousPage = page - 1;
   const nextPage = page + 1;
   const canGoPrevious =
-    !busy &&
-    previousPage >= 0 &&
-    presented.has(slides[previousPage]?.id ?? "");
+    !busy && previousPage >= 0 && presented.has(pages[previousPage]?.id ?? "");
   const canGoNext =
     !busy &&
-    nextPage < slides.length &&
-    presented.has(slides[nextPage]?.id ?? "");
+    nextPage < pages.length &&
+    presented.has(pages[nextPage]?.id ?? "");
 
   return (
     <section
@@ -364,11 +357,11 @@ export default function CourseRoom({
                 key={message.id}
                 className={`course-message ${message.role}`}
                 aria-current={
-                  message.slideId && message.slideId === current?.id
+                  message.pageId && message.pageId === current?.id
                     ? "step"
                     : undefined
                 }
-                data-slide-id={message.slideId}
+                data-page-id={message.pageId}
               >
                 <span>{message.role === "user" ? "我" : "知芽"}</span>
                 {message.role === "assistant" ? (
@@ -388,9 +381,21 @@ export default function CourseRoom({
           <Activity activity={activity} />
           <ConnectionRetry status={modelRetry} />
         </div>
-        {error && <p className="feedback error" role="alert">{error}</p>}
-        <form className="course-composer" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-          <label className="sr-only" htmlFor="course-prompt">告诉知芽你想学什么</label>
+        {error && (
+          <p className="feedback error" role="alert">
+            {error}
+          </p>
+        )}
+        <form
+          className="course-composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <label className="sr-only" htmlFor="course-prompt">
+            告诉知芽你想学什么
+          </label>
           <textarea
             id="course-prompt"
             value={text}
@@ -418,12 +423,71 @@ export default function CourseRoom({
       </section>
 
       {current && (
-        <section className="slide-stage" aria-label="分页课件">
-          <SlideCanvas key={current.id} slide={current} />
+        <section className="slide-stage" aria-label="课堂页面">
+          {current.kind === "slide" ? (
+            <SlideCanvas key={current.id} slide={current} />
+          ) : (
+            <Suspense
+              fallback={
+                <div className="coding-page-loading" role="status">
+                  正在加载代码编辑器…
+                </div>
+              }
+            >
+              <CodingPage
+                key={current.id}
+                exercise={current}
+                onChange={(changes) =>
+                  session.current?.updateCodingExercise(current.id, changes)
+                }
+                onRun={async () => {
+                  try {
+                    setError("");
+                    const result = await runCode(
+                      current.languageId,
+                      current.code,
+                      current.stdin,
+                    );
+                    session.current?.updateCodingExercise(current.id, {
+                      result,
+                    });
+                  } catch (error) {
+                    setError(
+                      error instanceof Error
+                        ? error.message
+                        : "代码暂时无法运行",
+                    );
+                  }
+                }}
+                onEnd={async () => {
+                  setBusy(true);
+                  try {
+                    await session.current?.requestExerciseReview();
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            </Suspense>
+          )}
           <footer className="slide-controls">
-            <button aria-label="上一页" title="上一页" disabled={!canGoPrevious} onClick={() => setPage(previousPage)}>←</button>
+            <button
+              aria-label="上一页"
+              title="上一页"
+              disabled={!canGoPrevious}
+              onClick={() => setPage(previousPage)}
+            >
+              ←
+            </button>
             <span>{`${page + 1} / ${presented.size}`}</span>
-            <button aria-label="下一页" title="下一页" disabled={!canGoNext} onClick={() => setPage(nextPage)}>→</button>
+            <button
+              aria-label="下一页"
+              title="下一页"
+              disabled={!canGoNext}
+              onClick={() => setPage(nextPage)}
+            >
+              →
+            </button>
           </footer>
         </section>
       )}

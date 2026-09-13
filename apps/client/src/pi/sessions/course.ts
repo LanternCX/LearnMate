@@ -5,6 +5,8 @@ import type {
   ModelRetryListener,
   ModelRetryStatus,
   Slide,
+  LessonPage,
+  CodingExercise,
   CourseMessage,
   CourseActivity,
   CourseConversationState,
@@ -12,15 +14,17 @@ import type {
 import type { ModelGateway } from "../gateway";
 import { createTeacherAgent, teacherToolLabel } from "../agent/teacher";
 import { createSlidesAgent } from "../agent/slides";
-import type { CourseManagement } from "../tool";
+import type { CodingTools, CourseManagement } from "../tool";
 import type { SlideRequest } from "../tools/create_slides";
 
 export class CourseSession {
   private teacher: Agent;
   private slideAgent: Agent | null = null;
-  private publishedSlides: Slide[] = [];
-  private pendingFirst: { task: number; reject: (error: Error) => void } | null =
-    null;
+  private publishedPages: LessonPage[] = [];
+  private pendingFirst: {
+    task: number;
+    reject: (error: Error) => void;
+  } | null = null;
   private slideTask = 0;
   private cancellation = 0;
   private stopped = false;
@@ -32,10 +36,10 @@ export class CourseSession {
     promise: Promise<void>;
     resolve: () => void;
   } | null = null;
-  private currentSlideId = "";
+  private currentPageId = "";
   private nextSlideWaiter: {
     afterId: string;
-    resolve: (slide: Slide) => void;
+    resolve: (page: LessonPage) => void;
     reject: (error: Error) => void;
   } | null = null;
   private modelRetries = new Map<"teacher" | "slides", ModelRetryStatus>();
@@ -45,16 +49,17 @@ export class CourseSession {
     info: ModelInfo,
     memory: string,
     private onMessage: (message: CourseMessage, replaceLast?: boolean) => void,
-    private onSlides: (slides: Slide[], generating: boolean) => void,
-    private onPresent: (slideId: string) => void,
+    private onPages: (pages: LessonPage[], generating: boolean) => void,
+    private onPresent: (pageId: string) => void,
     private onActivity: (activity: CourseActivity | null) => void,
     private onRetry: ModelRetryListener,
     private onError: (message: string) => void,
     initial: CourseConversationState,
     courseManagement: CourseManagement,
+    codingLanguages: CodingTools["languages"],
   ) {
-    this.publishedSlides = [...initial.slides];
-    this.currentSlideId = initial.currentSlideId;
+    this.publishedPages = [...initial.pages];
+    this.currentPageId = initial.currentPageId;
     this.messageSequence = initial.messages.reduce(
       (largest, message) => Math.max(largest, message.id),
       0,
@@ -69,10 +74,18 @@ export class CourseSession {
         start: (request) => this.startSlides(info, memory, request),
         cancel: () => this.cancelSlides(),
         read: () => ({
-          pages: this.publishedSlides,
+          pages: this.publishedPages.filter(
+            (page): page is Slide => page.kind === "slide",
+          ),
           generating: Boolean(this.slideAgent?.state.isStreaming),
         }),
         next: () => this.presentNextSlide(),
+      },
+      coding: {
+        languages: codingLanguages,
+        show: (id, exercise) => this.showCodingExercise(id, exercise),
+        read: () => this.currentCodingExercise(),
+        end: () => this.endCodingExercise(),
       },
       onRetry: (status) => this.updateModelRetry("teacher", status),
     });
@@ -102,8 +115,7 @@ export class CourseSession {
         event.type !== "message_end"
       )
         return;
-      if (event.message.role !== "assistant")
-        return;
+      if (event.message.role !== "assistant") return;
       if (event.type === "message_start") {
         this.streamingTeacherMessage = false;
         this.teacherMessageId = ++this.messageSequence;
@@ -136,7 +148,7 @@ export class CourseSession {
             role: "assistant",
             text,
             streaming: event.type === "message_update",
-            slideId: this.currentSlideId || undefined,
+            pageId: this.currentPageId || undefined,
           },
           this.streamingTeacherMessage,
         );
@@ -162,7 +174,9 @@ export class CourseSession {
         throw new Error(this.teacher.state.errorMessage);
     } catch (error) {
       if (!this.stopped && operation === this.cancellation)
-        this.onError(error instanceof Error ? error.message : "暂时无法继续教学");
+        this.onError(
+          error instanceof Error ? error.message : "暂时无法继续教学",
+        );
     }
   }
 
@@ -225,28 +239,50 @@ export class CourseSession {
     this.narrationPlayback = null;
   }
 
-  private present(slide: Slide) {
-    this.currentSlideId = slide.id;
-    this.onPresent(slide.id);
-    return slide;
+  updateCodingExercise(
+    id: string,
+    changes: Partial<Pick<CodingExercise, "code" | "stdin" | "result">>,
+  ) {
+    const index = this.publishedPages.findIndex(
+      (page) => page.kind === "coding" && page.id === id,
+    );
+    if (index < 0) return;
+    this.publishedPages[index] = {
+      ...(this.publishedPages[index] as CodingExercise),
+      ...changes,
+    };
+    this.onPages(
+      [...this.publishedPages],
+      Boolean(this.slideAgent?.state.isStreaming),
+    );
   }
 
-  private async presentNextSlide(): Promise<Slide> {
+  async requestExerciseReview() {
+    if (this.stopped || this.busy) return;
+    await this.prompt("我结束这次编程练习了，请审查我的最终代码并给出建议。");
+  }
+
+  private present(page: LessonPage) {
+    this.currentPageId = page.id;
+    this.onPresent(page.id);
+    return page;
+  }
+
+  private async presentNextSlide(): Promise<LessonPage> {
     const operation = this.cancellation;
     await this.waitForNarrationPlayback();
-    if (operation !== this.cancellation)
-      throw new Error("教学播放已停止");
-    const current = this.publishedSlides.findIndex(
-      (slide) => slide.id === this.currentSlideId,
+    if (operation !== this.cancellation) throw new Error("教学播放已停止");
+    const current = this.publishedPages.findIndex(
+      (page) => page.id === this.currentPageId,
     );
-    const next = this.publishedSlides[current + 1];
+    const next = this.publishedPages[current + 1];
     if (next) return this.present(next);
     if (!this.slideAgent?.state.isStreaming)
       return Promise.reject(new Error("没有等待讲解的下一页"));
     return new Promise((resolve, reject) => {
       this.nextSlideWaiter = {
-        afterId: this.currentSlideId,
-        resolve: (slide) => resolve(this.present(slide)),
+        afterId: this.currentPageId,
+        resolve: (page) => resolve(this.present(page)),
         reject,
       };
     });
@@ -281,10 +317,13 @@ export class CourseSession {
       publish: (id, page) => {
         if (task !== this.slideTask || this.stopped)
           throw new Error("This slide task is no longer current.");
-        const slide: Slide = { id, ...page };
+        const slide: Slide = { kind: "slide", id, ...page };
         slides.push(slide);
-        this.publishedSlides.push(slide);
-        this.onSlides([...slides], slides.length < request.pageCount);
+        this.publishedPages.push(slide);
+        this.onPages(
+          [...this.publishedPages],
+          slides.length < request.pageCount,
+        );
         if (slides.length === 1) {
           this.present(slide);
           if (this.pendingFirst?.task === task) this.pendingFirst = null;
@@ -292,10 +331,10 @@ export class CourseSession {
         }
         const waiter = this.nextSlideWaiter;
         if (waiter) {
-          const previous = this.publishedSlides.findIndex(
+          const previous = this.publishedPages.findIndex(
             (page) => page.id === waiter.afterId,
           );
-          const waitingPage = this.publishedSlides[previous + 1];
+          const waitingPage = this.publishedPages[previous + 1];
           if (waitingPage) {
             this.nextSlideWaiter = null;
             waiter.resolve(waitingPage);
@@ -307,11 +346,13 @@ export class CourseSession {
     });
     this.slideAgent = agent;
     void agent
-      .prompt(`Create ${request.pageCount} page(s) for this teaching goal: ${request.goal}`)
+      .prompt(
+        `Create ${request.pageCount} page(s) for this teaching goal: ${request.goal}`,
+      )
       .then(() => {
         if (task !== this.slideTask) return;
         this.slideAgent = null;
-        this.onSlides([...slides], false);
+        this.onPages([...this.publishedPages], false);
         const failure = agent.state.errorMessage
           ? new Error(agent.state.errorMessage)
           : slides.length < request.pageCount
@@ -329,7 +370,7 @@ export class CourseSession {
       .catch((error) => {
         if (task !== this.slideTask || this.stopped) return;
         this.slideAgent = null;
-        this.onSlides([...slides], false);
+        this.onPages([...this.publishedPages], false);
         const failure =
           error instanceof Error ? error : new Error("课件生成失败");
         if (slides.length === 0) {
@@ -339,5 +380,57 @@ export class CourseSession {
         this.onError(failure.message);
       });
     return first;
+  }
+
+  private showCodingExercise(
+    id: string,
+    draft: Pick<
+      CodingExercise,
+      "title" | "instructions" | "languageId" | "languageName" | "starterCode"
+    >,
+  ) {
+    const exercise: CodingExercise = {
+      kind: "coding",
+      id,
+      ...draft,
+      code: draft.starterCode,
+      stdin: "",
+      status: "active",
+    };
+    const current = this.publishedPages.findIndex(
+      (page) => page.id === this.currentPageId,
+    );
+    this.publishedPages.splice(
+      current < 0 ? this.publishedPages.length : current + 1,
+      0,
+      exercise,
+    );
+    this.onPages(
+      [...this.publishedPages],
+      Boolean(this.slideAgent?.state.isStreaming),
+    );
+    this.present(exercise);
+    return exercise;
+  }
+
+  private currentCodingExercise() {
+    const exercise = [...this.publishedPages]
+      .reverse()
+      .find(
+        (page): page is CodingExercise =>
+          page.kind === "coding" && page.status === "active",
+      );
+    if (!exercise) throw new Error("没有进行中的编程练习");
+    return exercise;
+  }
+
+  private endCodingExercise() {
+    const exercise = this.currentCodingExercise();
+    exercise.status = "ended";
+    this.onPages(
+      [...this.publishedPages],
+      Boolean(this.slideAgent?.state.isStreaming),
+    );
+    return exercise;
   }
 }

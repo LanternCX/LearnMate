@@ -14,6 +14,7 @@ export type AssistantOutput = {
 };
 
 export type Slide = {
+  kind: "slide";
   id: string;
   title: string;
   kicker?: string;
@@ -22,12 +23,39 @@ export type Slide = {
   layout: "explain" | "steps" | "compare";
 };
 
+export type CodingExercise = {
+  kind: "coding";
+  id: string;
+  title: string;
+  instructions: string;
+  languageId: number;
+  languageName: string;
+  starterCode: string;
+  code: string;
+  stdin: string;
+  status: "active" | "ended";
+  result?: CodeRunResult;
+};
+
+export type LessonPage = Slide | CodingExercise;
+
+export type CodeLanguage = { id: number; name: string };
+export type CodeRunResult = {
+  stdout: string;
+  stderr: string;
+  compileOutput: string;
+  message: string;
+  status: { description: string };
+  time: string;
+  memory: number;
+};
+
 export type CourseMessage = {
   id: number;
   role: "user" | "assistant";
   text: string;
   streaming?: boolean;
-  slideId?: string;
+  pageId?: string;
 };
 
 export type CourseActivity =
@@ -41,9 +69,9 @@ export type CourseActivity =
 
 export type CourseConversationState = {
   messages: CourseMessage[];
-  slides: Slide[];
-  presentedSlideIds: string[];
-  currentSlideId: string;
+  pages: LessonPage[];
+  presentedPageIds: string[];
+  currentPageId: string;
 };
 
 export type CourseCover = {

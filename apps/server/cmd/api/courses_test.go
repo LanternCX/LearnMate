@@ -30,9 +30,9 @@ func TestCourseCRUDPersistsOneConversation(t *testing.T) {
 
 	state := map[string]any{
 		"messages":          []any{map[string]any{"id": 1, "role": "user", "text": "什么是人工智能？"}},
-		"slides":            []any{},
-		"presentedSlideIds": []any{},
-		"currentSlideId":    "",
+		"pages":            []any{},
+		"presentedPageIds": []any{},
+		"currentPageId":    "",
 	}
 	a.request(student, "PUT", "/courses/"+id+"/conversation", map[string]any{
 		"conversationId": conversationID,

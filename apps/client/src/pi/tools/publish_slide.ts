@@ -4,7 +4,7 @@ import type { Slide } from "../../domain/learning";
 
 /** Publication succeeds only when the active generation accepts the page. */
 export function publishSlideTool(
-  publish: (id: string, page: Omit<Slide, "id">) => number,
+  publish: (id: string, page: Omit<Slide, "id" | "kind">) => number,
 ): AgentTool {
   return {
     name: "publish_slide",
@@ -41,7 +41,7 @@ export function publishSlideTool(
     }),
     executionMode: "sequential",
     execute: async (id, params) => {
-      const count = publish(id, params as Omit<Slide, "id">);
+      const count = publish(id, params as Omit<Slide, "id" | "kind">);
       return {
         content: [{ type: "text", text: `Page ${count} is visible.` }],
         details: { page: count },
