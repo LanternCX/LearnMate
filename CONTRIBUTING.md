@@ -30,6 +30,12 @@
 
 使用对应模板的标题前缀和类型标签。需求与技术依据、开发和提交约定统一见 [AGENTS.md](AGENTS.md)。
 
+## 从 main 创建贡献分支
+
+GitHub Fork 会复制整个仓库，而不是只复制某个分支。Fork `LanternCX/zhiya` 后，先将 Fork 仓库的 `main` 与上游最新 `main` 同步，再从 `main` 创建功能分支。
+
+功能分支开发期间只同步 `main`，不要合并或 rebase 到 `dev`。所有贡献 PR 都必须以 `LanternCX/zhiya` 的 `main` 为目标分支，不要向 `dev` 提交 PR。
+
 ## 完成实现后提交 PR
 
 完成约定范围的实现和验证后，按 [PR 模板](.github/pull_request_template.md) 提交 PR；有相关 Issue 时附上关联链接。
